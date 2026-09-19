@@ -1,3 +1,5 @@
+![Qwen Media Skills](assets/readme/qwen-media-skills-banner.png)
+
 # Qwen Media Skills
 
 让你的 Agent 能听懂音频、看懂视频。
