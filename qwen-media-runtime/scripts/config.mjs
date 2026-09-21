@@ -83,6 +83,7 @@ export function resolveConfig(env = process.env) {
   return {
     apiKey,
     apiKeyPresent: Boolean(apiKey),
+    guideStatus: local.guideStatus || 'not_started',
     region,
     baseUrl,
     endpoints,
@@ -107,6 +108,7 @@ export function statePath(config) {
 export function publicConfig(config) {
   return {
     apiKeyPresent: config.apiKeyPresent,
+    guideStatus: config.guideStatus,
     region: config.region,
     baseUrl: config.baseUrl,
     endpoints: config.endpoints,

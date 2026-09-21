@@ -13,6 +13,7 @@ function commandExists(command) {
 export async function checkEnvironment(config) {
   const checks = {
     dashscopeApiKey: config.apiKeyPresent,
+    firstRunGuide: config.guideStatus === 'complete',
     region: Boolean(config.region),
     compatibleBaseUrl: Boolean(config.baseUrl),
     endpointMap: Object.values(config.endpoints).every(Boolean),
@@ -33,7 +34,7 @@ async function main() {
     await fs.mkdir(config.configDir, { recursive: true });
     await fs.writeFile(statePath(config), `${JSON.stringify({ initialized: true, runtimeVersion: '1.0.0', region: config.region, checkedAt: new Date().toISOString() }, null, 2)}\n`, 'utf8');
   }
-  const output = report.ready ? { ok: true, ...report } : { ok: false, ...report, next: '请由 Agent 执行首次配置引导：先检查 setup.ps1 -Action Check，获得安装同意后 Install -Consent，再 Open 打开本机配置页。用户不需要手动安装或设置环境变量。' };
+  const output = report.ready ? { ok: true, ...report } : { ok: false, ...report, next: '请由 Agent 执行首次配置引导：先运行 setup.ps1 -Action Check，说明缺失项并获得安装同意，再运行 setup.ps1 -Action Guide -Consent；等待 complete 后继续原任务。用户不需要手动安装或设置环境变量。' };
   console.log(json ? JSON.stringify(output) : JSON.stringify(output, null, 2));
   if (!report.ready) process.exitCode = 10;
 }

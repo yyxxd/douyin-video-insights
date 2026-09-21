@@ -4,9 +4,7 @@
 
 ## 入口与同意
 
-收到下载、转写、分析请求后先保留原任务和链接。首次使用默认同时引导下载与 AI，不因用户只发了下载链接就隐去 AI 配置选项。询问：
-
-> 我会带你配置下载、提取口播、视频分析和分镜。你想“配置全部功能（推荐）”，还是“暂时只用下载”？AI 功能使用时可能产生费用。
+安装 Skill 时就执行完整配置。Agent 必须先保留用户的原任务和参数，再启动引导并等待结构化结束状态；不先询问“全部功能还是仅下载”。手动复制安装无法触发安装钩子时，在第一次实际使用中执行同一流程兜底。
 
 只做只读检查，不要求 Python、Node 或 uv 预先存在：
 
@@ -14,23 +12,25 @@
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Check
 ```
 
-读取 missing、directory、environmentPrepared 和 configuration。将实际缺失项翻译为“运行工具、音视频处理工具、浏览器连接工具”，告知会从官方发布源下载安装到当前用户目录，不更改系统 PATH、不收费调用模型。不要捏造安装大小和耗时。取得安装同意后再执行：
+读取 missing、directory、environmentPrepared 和 configuration。存在缺失项时，再执行只读网络探测：
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Install -Consent
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Probe
+```
+
+将实际缺失项翻译为“运行工具、音视频处理工具、浏览器连接工具”，并根据 Probe 结果说明安装器会优先使用当前更快的官方源或国内镜像，失败时自动回退。下载的 ZIP 无论来自哪条线路都必须通过固定 SHA256 校验；PyPI 只使用 HTTPS 官方源或已登记镜像。告知会下载安装到当前用户目录，不更改系统 PATH、不收费调用模型。不要捏造安装大小和耗时。取得安装同意后执行统一入口：
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Guide -Consent
 ```
 
 `-Consent` 只能代表已经取得的安装许可，不能由 Agent 自行当作用户同意。许可覆盖已说明的这一批安装；不用重复询问每个组件。拒绝则停止安装，原任务保留。部分失败可以重试，已完成部分复用，不主动删改日常工具。检测到安装不完整、版本不可用再修复；已准备完成不反复安装。
 
 ## 图形引导
 
-```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Open
-```
+`Guide` 会补齐缺失工具、打开本机配置页并保持运行。没有自动打开时，把输出的 setupUrl 做成可点击链接。只监听 127.0.0.1；不要转发链接到第三方。不要以自动化方式替用户勾选登录、密钥或浏览器安装同意项。
 
-以后台任务启动并保留其进程；工具会打开本机配置页。没有自动打开时，把返回的 setupUrl 做成可点击链接。只监听 127.0.0.1；不要转发链接到第三方。不要以自动化方式替用户勾选登录、密钥或浏览器安装同意项。用户已在会话中明确选择后，可代其保存相同功能偏好，但不能扩大授权。
-
-页面默认“配置全部功能”，允许随时跳过 AI。Agent 告诉用户按照页面选择，完成后自动继续原任务，而不是让用户重发链接。等待时可以继续本地验证；不反复催促登录。
+页面直接引导完整配置，不再先让用户选择功能模式。用户仍可明确跳过 AI，此时结果是 `partial`，不能表述为“全部配置完成”。`Guide` 返回 `complete` 或 `partial` 后，Agent 自动继续保存的原任务；返回 `cancelled` 或 `timeout` 时不执行原任务，并说明已完成配置会保留。不要让用户重发链接。
 
 ### 抖音
 
@@ -44,7 +44,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runti
 
 页面指导已有账号者输入百炼密钥，没有账号者打开官方控制台。当前只支持北京地域；注册、实名、付款由用户完成。密码和密钥只在本机页面或官方网页输入，不进入聊天、命令行参数或日志。
 
-AI 密钥保存为当前 Windows 用户的 DASHSCOPE_API_KEY 环境变量，不是加密存储。先检测已有变量，不回显密钥；留空可检查已有连接。覆盖或清除需明确确认可能影响其他工具。Run 入口刷新当前用户变量，使后续任务立即使用；其他已运行软件可能需重新打开。页面查询官方模型列表检查连通性，不生成内容。服务拒绝、网络失败、仅保存、连接成功分别呈现；不能把模型列表成功当成 ASR、Filetrans、Omni 都能用。
+AI 密钥保存为当前 Windows 用户的 DASHSCOPE_API_KEY 环境变量，不是加密存储。先检测已有变量，不回显密钥；留空可检查已有连接。覆盖或清除需明确确认可能影响其他工具。Run 入口刷新当前用户变量，使后续任务立即使用；其他已运行软件可能需重新打开。页面查询官方模型列表并校验响应结构，不生成内容。必须先验证、后保存：认证、权限、限流、服务异常、超时、网络或响应格式错误都不得覆盖旧 Key、费用选择和能力验证记录。只有候选 Key 验证成功后才保存；同一个 Key 复检不清空 ASR / Omni 验证记录。不能把模型列表成功当成 ASR、Filetrans、Omni 都能用。
 
 默认“每次询问”；用户可指定每个完整任务的金额上限。页面设置真正接入 TaskBudget，不能把一个任务拆成多个小任务规避限额。首次验证若要发送音视频并调用模型，先展示素材、用途和估算费用，按用户保存的授权范围执行；需要确认时使用既有 budget 流程。只配置服务不代表授权任意收费测试。
 

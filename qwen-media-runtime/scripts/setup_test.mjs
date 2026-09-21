@@ -7,6 +7,7 @@ import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { readSettings, writeSettings, saveSecret, readSecret } from './local_settings.mjs';
 import { createAIEnvironment } from './ai_environment.mjs';
+import { guideState, verifyAIKey } from './setup_state.mjs';
 import { resolveConfig } from './config.mjs';
 import { registerOperations, startOperation, cancelOpenOperations, finalizeTask } from './task_budget.mjs';
 
@@ -42,6 +43,14 @@ assert.throws(() => variable.clear(), /确认/);
 variable.clear(true);
 assert.equal(stored, '');
 assert.equal(childEnv.DASHSCOPE_API_KEY, undefined);
+assert.equal(guideState({ settings: { ai: 'connected' }, loginSaved: true, aiSaved: true }).status, 'complete');
+assert.equal(guideState({ settings: { aiSkipped: true }, loginSaved: true, aiSaved: false }).status, 'partial');
+assert.equal(guideState({ settings: { ai: 'connected' }, loginSaved: false, aiSaved: true }).status, 'in_progress');
+await verifyAIKey('valid', async () => new Response(JSON.stringify({ data: [] }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+await assert.rejects(verifyAIKey('bad', async () => new Response('{}', { status: 401 })), /无效/);
+await assert.rejects(verifyAIKey('limited', async () => new Response('{}', { status: 429 })), /频繁/);
+await assert.rejects(verifyAIKey('malformed', async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })), /格式异常/);
+await assert.rejects(verifyAIKey('offline', async () => { throw new Error('offline'); }), /无法连接/);
 
 const script = fileURLToPath(new URL('./setup-server.mjs', import.meta.url));
 const child = spawn(process.execPath, [script, '--no-open'], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
@@ -70,8 +79,9 @@ try {
   assert.equal((await post('ai', { key: 'bad', consent: false })).status, 400);
   assert.equal((await post('install-browser', { consent: false })).status, 400);
   assert.equal((await post('ai', { key: 'bad', consent: true, costMode: 'limit', costLimit: -1 })).status, 400);
-  assert.equal((await post('preferences', { mode: 'download' })).status, 200);
-  assert.equal(readSettings(env).mode, 'download');
+  assert.equal((await post('finish', {})).status, 400);
+  assert.equal((await post('skip-ai', {})).status, 200);
+  assert.equal(readSettings(env).aiSkipped, true);
   assert.equal((await post('forget', { name: 'api-key' })).status, 400);
   assert.equal((await post('forget', { name: 'douyin-session' })).status, 200);
   assert.equal(readSecret('douyin-session', env), '');

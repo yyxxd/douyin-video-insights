@@ -6,12 +6,14 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { readSettings, writeSettings, settingsDirectory } from './local_settings.mjs';
 import { aiEnvironment } from './ai_environment.mjs';
+import { GUIDE_VERSION, guideState, verifyAIKey } from './setup_state.mjs';
 
 const scriptDirectory = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(scriptDirectory, '../..');
 const token = randomBytes(32).toString('hex');
 const directory = settingsDirectory();
 let job = { busy: false, message: '' };
+let finished = false;
 
 function browsers() {
   const roots = [process.env.PROGRAMFILES, process.env['PROGRAMFILES(X86)'], process.env.LOCALAPPDATA].filter(Boolean);
@@ -23,7 +25,8 @@ function status() {
   const settings = readSettings();
   const validations = Object.fromEntries(['asr', 'omni'].map(kind => { const file = path.join(directory, `${kind}-validation.json`); return [kind, fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, 'utf8')) : null]; }));
   const ai = aiEnvironment.status();
-  return { settings, validations, browsers: browsers(), job, loginSaved: fs.existsSync(path.join(directory, 'douyin-session.protected')), aiSaved: ai.present, aiUserConfigured: ai.userConfigured, directory };
+  const loginSaved = fs.existsSync(path.join(directory, 'douyin-session.protected'));
+  return { settings, validations, browsers: browsers(), job, loginSaved, aiSaved: ai.present, aiUserConfigured: ai.userConfigured, guide: guideState({ settings, loginSaved, aiSaved: ai.present }), directory };
 }
 
 function startJob(command, args, success, onSuccess = () => {}) {
@@ -47,24 +50,15 @@ async function saveAI(data) {
   if (!['always', 'limit'].includes(data.costMode)) throw new Error('请选择费用确认方式。');
   const limit = Number(data.costLimit);
   if (data.costMode === 'limit' && (!Number.isFinite(limit) || limit <= 0 || limit > 100)) throw new Error('请填写大于 0 且不超过 100 元的任务金额上限。');
+  await verifyAIKey(key);
+  const oldKey = aiEnvironment.value();
   if (supplied) aiEnvironment.save(key, data.confirmReplace === true);
-  for (const kind of ['asr', 'omni']) fs.rmSync(path.join(directory, `${kind}-validation.json`), { force: true });
-  writeSettings({ ai: 'saved', environmentManaged: supplied ? true : readSettings().environmentManaged, asr: null, omni: null, costMode: data.costMode, costLimit: data.costMode === 'limit' ? limit : 0 });
-  // 此接口仅查询模型列表，不发送音视频或发起模型生成；不能据此宣称所有模型已验证。
-  try {
-    const response = await fetch('https://dashscope.aliyuncs.com/compatible-mode/v1/models', { headers: { Authorization: `Bearer ${key}` }, signal: AbortSignal.timeout(15000) });
-    const result = response.status === 401 || response.status === 403 ? 'rejected' : response.ok ? 'connected' : 'unverified';
-    writeSettings({ ai: result });
-    return { message: result === 'connected' ? 'AI 服务连接检查通过。语音和画面处理需在获准的真实任务中分别验证。' : result === 'rejected' ? '密钥已保存，但服务拒绝访问，请核对账号和密钥。' : '密钥已保存，暂未确认服务可用；可以稍后继续检查。' };
-  } catch { writeSettings({ ai: 'unverified' }); return { message: 'AI 配置已保留，但网络检查未完成；不会因此阻止下载。' }; }
+  if (supplied && oldKey !== key) for (const kind of ['asr', 'omni']) fs.rmSync(path.join(directory, `${kind}-validation.json`), { force: true });
+  writeSettings({ ai: 'connected', aiSkipped: false, guideStarted: true, guideStatus: 'in_progress', guideVersion: GUIDE_VERSION, environmentManaged: supplied ? true : readSettings().environmentManaged, costMode: data.costMode, costLimit: data.costMode === 'limit' ? limit : 0 });
+  return { message: 'AI 服务连接检查通过，配置已保存。语音和画面处理需在获准的真实任务中分别验证。' };
 }
 
 async function action(name, data) {
-  if (name === 'preferences') {
-    if (!['all', 'download'].includes(data.mode)) throw new Error('请选择要配置的功能。');
-    writeSettings({ mode: data.mode, guideStarted: true });
-    return { message: '选择已保存。' };
-  }
   if (name === 'login') {
     if (!data.consent || !browsers().some(b => b.id === data.browser)) throw new Error('请选择可用浏览器，并同意连接抖音。');
     const tools = JSON.parse(fs.readFileSync(path.join(directory, 'toolchain.json'), 'utf8'));
@@ -77,7 +71,27 @@ async function action(name, data) {
     return { message: '正在通过 Windows 软件包管理器安装 Chrome；若系统阻止安装，请让 Agent 协助。' };
   }
   if (name === 'ai') return saveAI(data);
-  if (name === 'skip-ai') { writeSettings({ mode: 'download' }); return { message: '已切换为仅下载。以后说“配置 AI 功能”即可继续。' }; }
+  if (name === 'skip-ai') { writeSettings({ mode: 'download', aiSkipped: true, guideStarted: true, guideStatus: 'in_progress', guideVersion: GUIDE_VERSION }); return { message: '已明确跳过 AI；完成后将标记为部分配置。以后可随时回来补充。' }; }
+  if (name === 'finish') {
+    const current = status();
+    if (current.job.busy) throw new Error('请先完成当前操作。');
+    if (!current.guide.loginReady) throw new Error('请先完成抖音登录。');
+    if (!current.guide.aiReady && !current.guide.aiSkipped) throw new Error('请先通过 AI 连接检查，或明确选择暂时跳过 AI。');
+    const guideStatus = current.guide.aiSkipped ? 'partial' : 'complete';
+    writeSettings({ guideStatus, guideVersion: GUIDE_VERSION, mode: guideStatus === 'complete' ? 'all' : 'download' });
+    finished = true;
+    setImmediate(() => server.close());
+    console.log(JSON.stringify({ event: 'guide-finished', status: guideStatus }));
+    return { message: guideStatus === 'complete' ? '全部配置已完成，可以继续原任务。' : '基础下载配置已完成，AI 已跳过，可以继续原任务。', status: guideStatus };
+  }
+  if (name === 'cancel') {
+    writeSettings({ guideStatus: 'cancelled', guideVersion: GUIDE_VERSION });
+    finished = true;
+    process.exitCode = 20;
+    setImmediate(() => server.close());
+    console.log(JSON.stringify({ event: 'guide-finished', status: 'cancelled' }));
+    return { message: '配置已暂停，已完成的内容会保留。', status: 'cancelled' };
+  }
   if (name === 'forget') {
     if (job.busy) throw new Error('请先结束正在进行的连接。');
     if (!['api-key', 'douyin-session'].includes(data.name)) throw new Error('未知设置。');
@@ -127,10 +141,12 @@ const server = http.createServer(async (req, res) => {
 server.requestTimeout = 20000;
 server.listen(0, '127.0.0.1', () => {
   const url = `http://127.0.0.1:${server.address().port}/${token}`;
-  console.log(JSON.stringify({ setupUrl: url, message: '请打开本机配置页面。完成后回到 Agent，原任务可继续。' }));
+  writeSettings({ guideStarted: true, guideStatus: 'in_progress', guideVersion: GUIDE_VERSION });
+  console.log(JSON.stringify({ setupUrl: url, message: '请在本机配置页面完成设置；完成后 Agent 会自动继续。' }));
   if (!process.argv.includes('--no-open')) {
     const child = spawn('powershell.exe', ['-NoProfile', '-Command', 'Start-Process $env:QWEN_SETUP_URL'], { windowsHide: true, env: { ...process.env, QWEN_SETUP_URL: url }, stdio: 'ignore' });
     child.on('error', () => console.error('请手动打开上面的本机配置链接。'));
+    child.on('close', code => { if (code !== 0) console.error('浏览器未能自动打开，请手动打开上面的本机配置链接。'); });
   }
 });
-setTimeout(() => { if (!job.busy) server.close(); }, 30 * 60 * 1000).unref();
+setTimeout(() => { if (!job.busy && !finished) { process.exitCode = 21; console.log(JSON.stringify({ event: 'guide-finished', status: 'timeout' })); server.close(); } }, 30 * 60 * 1000).unref();
