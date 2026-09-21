@@ -1,0 +1,4 @@
+interface:
+  display_name: "yy-抖音视频下载、分析与图文分镜"
+  short_description: "下载抖音分享视频、提取口播、分析内容，并结合原片截图还原详细分镜"
+  default_prompt: "使用 $yy-douyin-video 分析这个抖音视频，生成带原片截图、台词时间线和动作描述的详细分镜。"

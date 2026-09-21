@@ -1,8 +1,10 @@
-![Qwen Media Skills](assets/readme/qwen-media-skills-banner.png)
+![Douyin Video Insights](assets/readme/qwen-media-skills-banner.png)
 
-# Qwen Media Skills
+# 抖音视频分析（Douyin Video Insights）
 
-让你的 Agent 能听懂音频、看懂视频。
+让你的 Agent 下载抖音视频、提取口播、理解内容并生成分镜。
+
+项目标识：`douyin-video-insights`
 
 这套 Skills 适用于支持自定义 Skill、工具或脚本的 Agent 软件。接入后，Agent 可以根据你的自然语言意图，自动选择合适的能力来处理媒体文件。
 
@@ -21,34 +23,35 @@
 
 ## 怎么用？
 
-把本仓库中的 Skills 安装到你的 Agent 软件中，然后配置 Qwen / DashScope API Key。安装完成后，直接用自然语言描述需求即可。
+下载完整发布包，让支持本机执行的 Agent 安装这套 Skills。安装完成后，直接发送下载、转写或分析任务；Agent 发现配置不完整时，会自动打开本机配置网页，不需要用户另外发“配置”指令。首次会引导：
 
-Agent 会根据你的意图选择：
+1. 选择“配置全部功能（推荐）”或“暂时只用下载”。
+2. 同意后由 Agent 安装缺少的工具，无需手动运行命令。
+3. 选择平时使用的浏览器，在独立抖音窗口扫码登录一次。
+4. 在本机页面连接百炼并选择费用规则；可以跳过 AI，以后继续。
+5. 回到 Agent，继续最初的下载、提取口播或分镜任务。
 
-- 语音相关任务 → Qwen ASR
-- 画面理解、总结和分镜任务 → Qwen Omni
-- 同时需要语音和画面分析 → 两者组合调用
-
-你不需要记住命令，也不需要因为输入文件是 MP4 就手动选择视频模型。
+自动配置支持 Windows x64、Chrome / Edge 和具有本机终端权限的 Agent。抖音登录信息使用当前 Windows 用户加密保存在本机；AI Key 保存为当前 Windows 用户环境变量 `DASHSCOPE_API_KEY`。不需要导出 Cookie，也不要把密钥发到聊天里。仅下载任务不会调用 AI。
 
 ## 让 AI 帮你安装
 
 如果你不确定自己的 Agent 软件该怎么安装，可以把下面这段提示词直接复制给它：
 
 ```text
-请帮我安装这个公开仓库中的媒体处理 Skills：
+请帮我安装这个公开仓库中的抖音视频分析 Skills：
 
-https://github.com/yyxxd/qwen-media-skills
+https://github.com/yyxxd/douyin-video-insights
 
 请先判断你当前支持哪种 Skill、工具或脚本安装方式，再选择兼容的方式安装。需要安装的内容包括：
 
-- qwen-asr：音频和视频语音转写
-- qwen-omni：视频理解、总结和分镜分析
-- qwen-media-runtime：两个 Skill 共用的运行时
+- yy-douyin-video：抖音视频下载、内容分析与图文分镜编排
+- yy-qwen-asr：音频和视频语音转写
+- yy-qwen-omni：视频理解、总结和分镜分析
+- qwen-media-runtime：三个 Skill 共用的运行时
 
-安装完成后，请检查 Node.js、FFmpeg 和 FFprobe 是否可用，并告诉我还缺少哪些依赖。
+安装完成后，请按照 yy-douyin-video/references/first-run.md 带我配置。默认介绍全部功能，也让我可以选择先只下载。请先检查缺少的工具，说明安装清单并征得同意后自动安装；通过本机页面引导浏览器登录、AI 服务和费用设置，不要让我自己执行命令或导出 Cookie。
 
-请不要索要、打印、保存或提交我的 API Key。API Key 只应通过安全的环境变量或该 Agent 支持的凭据配置保存。
+不要让我把密钥发到聊天里，也不要打印或提交密钥。请使用本工具的本机环境变量配置页面；已有环境变量也可作为兼容方式。
 
 安装后请用一个本地媒体文件做一次不产生实际模型调用的配置检查，并告诉我如何使用自然语言调用这些能力。
 ```
@@ -67,19 +70,24 @@ https://github.com/yyxxd/qwen-media-skills
 
 ## 包含哪些内容？
 
-- `qwen-asr/`：语音转写能力
-- `qwen-omni/`：视频理解能力
+- `yy-douyin-video/`：抖音链接获取与意图编排、带时间戳的图文分镜、原片截图和 HTML/Markdown 报告
+- `yy-qwen-asr/`：语音转写能力
+- `yy-qwen-omni/`：视频理解能力
 - `qwen-media-runtime/`：共享运行时、媒体检测、费用控制和上传处理
 
 ## 使用前准备
 
-需要准备 Node.js 18+、FFmpeg、FFprobe 和阿里云百炼 DashScope API Key。
+抖音下载优先使用独立 Chrome + Playwright，需 Chrome、Python、uv、FFmpeg、FFprobe ，由首次引导自动准备并连接抖音；不需要用户导出 Cookie。yt-dlp 为可选入口。仅下载不需要模型 API Key。命令见 [yy-douyin-video/SKILL.md](yy-douyin-video/SKILL.md)。`yy-douyin-video` 与下列三个目录必须保持同级。可直接说“分析这个抖音链接”“提取口播稿”或“生成带原片截图的详细分镜”。详细分镜按 ASR 时间线 → Omni 画面分析 → FFmpeg 截图 → 图文报告执行；支持本地视频作为输入。
+
+2026-09-21：浏览器入口已通过四个真实分享链接的完整下载、时长核对和全片解码验收，均为 1080×1920 且带音轨。此结果不代表所有链接永久可用，也不代表真实视频的模型还原质量已验收。详见 [下载方案验证](yy-douyin-video/references/download-validation.md)。
+
+首次引导会自动准备工具并引导连接百炼。熟悉命令行的用户也可以继续使用环境变量：
 
 ```powershell
 $env:DASHSCOPE_API_KEY = "your-api-key"
 ```
 
-请不要把 API Key 写入代码或提交到 Git 仓库。
+请不要把 API Key 写入代码或提交到 Git 仓库。配置页面不会回显已保存的 Key。
 
 ## 技术说明
 

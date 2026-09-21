@@ -1,6 +1,6 @@
 interface:
-  display_name: "Qwen ASR"
+  display_name: "yy-Qwen ASR"
   short_description: "使用 Qwen 进行音频语音识别"
-  default_prompt: "Use $qwen-asr to transcribe this audio file."
+  default_prompt: "Use $yy-qwen-asr to transcribe this audio file."
 policy:
   allow_implicit_invocation: true

@@ -1,0 +1,84 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import http from 'node:http';
+import { fileURLToPath } from 'node:url';
+import { readSettings, writeSettings, saveSecret, readSecret } from './local_settings.mjs';
+import { createAIEnvironment } from './ai_environment.mjs';
+import { resolveConfig } from './config.mjs';
+import { registerOperations, startOperation, cancelOpenOperations, finalizeTask } from './task_budget.mjs';
+
+const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'media-setup-test-'));
+const env = { ...process.env, QWEN_MEDIA_CONFIG_DIR: directory, DASHSCOPE_API_KEY: 'test-key-never-used-for-network' };
+const sample = 'test-key-never-used-for-network';
+saveSecret('douyin-session', sample, env);
+assert.equal(readSecret('douyin-session', env), sample);
+assert.ok(!fs.readFileSync(path.join(directory, 'douyin-session.protected'), 'utf8').includes(sample));
+writeSettings({ mode: 'all', costMode: 'always' }, env);
+assert.equal(resolveConfig(env).thresholdCny, 0);
+assert.equal(resolveConfig(env).apiKey, sample);
+const taskId = `setup-test-${Date.now()}`;
+const config = resolveConfig(env);
+await registerOperations(taskId, [{ operationId: 'asr', skill: 'ASR', model: 'test', estimatedCost: 0.01 }], config);
+assert.equal((await startOperation(taskId, 'asr', config)).allowed, false);
+await cancelOpenOperations(taskId, config);
+await finalizeTask(taskId);
+writeSettings({ costMode: 'limit', costLimit: 0.2 }, env);
+assert.equal(resolveConfig(env).thresholdCny, 0.2);
+assert.equal(readSettings(env).mode, 'all');
+assert.equal(resolveConfig({ ...env, DASHSCOPE_API_KEY: 'environment-fallback' }).apiKey, 'environment-fallback');
+let stored = 'existing-key';
+const childEnv = { DASHSCOPE_API_KEY: 'old-process-key' };
+const variable = createAIEnvironment({ read: () => stored, write: value => { stored = value; }, env: childEnv });
+assert.equal(variable.value(), 'existing-key');
+assert.throws(() => variable.save('replacement'), /确认/);
+assert.equal(stored, 'existing-key');
+variable.save('replacement', true);
+assert.equal(stored, 'replacement');
+assert.equal(childEnv.DASHSCOPE_API_KEY, 'replacement');
+assert.throws(() => variable.clear(), /确认/);
+variable.clear(true);
+assert.equal(stored, '');
+assert.equal(childEnv.DASHSCOPE_API_KEY, undefined);
+
+const script = fileURLToPath(new URL('./setup-server.mjs', import.meta.url));
+const child = spawn(process.execPath, [script, '--no-open'], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+try {
+  const url = await new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('配置服务启动超时')), 10000);
+    let buffer = '';
+    child.stdout.on('data', chunk => { buffer += chunk; if (buffer.includes('\n')) { clearTimeout(timer); resolve(JSON.parse(buffer.split('\n')[0]).setupUrl); } });
+    child.on('error', reject);
+  });
+  const target = new URL(url);
+  const headers = { 'X-Setup-Token': target.pathname.slice(1), Origin: target.origin, 'Content-Type': 'application/json' };
+  assert.equal((await fetch(`${target.origin}/status`)).status, 403);
+  const badHost = await new Promise((resolve, reject) => {
+    const req = http.get(`${target.origin}/status`, { headers: { ...headers, Host: 'evil.example' } }, res => { res.resume(); resolve(res.statusCode); });
+    req.on('error', reject);
+  });
+  assert.equal(badHost, 403);
+  const response = await fetch(`${target.origin}/status`, { headers });
+  const state = await response.text();
+  assert.ok(!state.includes(sample));
+  assert.equal(JSON.parse(state).aiSaved, true);
+  const post = (route, data, overrides = {}) => fetch(`${target.origin}/${route}`, { method: 'POST', headers: { ...headers, ...overrides }, body: JSON.stringify(data) });
+  assert.equal((await post('preferences', { mode: 'download' }, { Origin: 'https://evil.example' })).status, 403);
+  assert.equal((await post('login', { browser: 'chrome', consent: false })).status, 400);
+  assert.equal((await post('ai', { key: 'bad', consent: false })).status, 400);
+  assert.equal((await post('install-browser', { consent: false })).status, 400);
+  assert.equal((await post('ai', { key: 'bad', consent: true, costMode: 'limit', costLimit: -1 })).status, 400);
+  assert.equal((await post('preferences', { mode: 'download' })).status, 200);
+  assert.equal(readSettings(env).mode, 'download');
+  assert.equal((await post('forget', { name: 'api-key' })).status, 400);
+  assert.equal((await post('forget', { name: 'douyin-session' })).status, 200);
+  assert.equal(readSecret('douyin-session', env), '');
+  console.log('SETUP_SECURITY_AND_PERSISTENCE_OK');
+} finally {
+  child.kill();
+  await new Promise(resolve => child.once('close', resolve));
+  for (const file of fs.readdirSync(directory)) fs.unlinkSync(path.join(directory, file));
+  fs.rmdirSync(directory);
+}

@@ -1,6 +1,6 @@
 interface:
-  display_name: "Qwen Omni"
+  display_name: "yy-Qwen Omni"
   short_description: "使用 Qwen 理解视频内容并分析镜头"
-  default_prompt: "Use $qwen-omni to analyze this video."
+  default_prompt: "Use $yy-qwen-omni to analyze this video."
 policy:
   allow_implicit_invocation: true
