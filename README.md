@@ -40,7 +40,7 @@
 ```text
 请帮我安装这个公开仓库中的抖音视频分析 Skills：
 
-https://github.com/yyxxd/qwen-media-skills
+https://github.com/yyxxd/douyin-video-insights
 
 请先判断你当前支持哪种 Skill、工具或脚本安装方式，再选择兼容的方式安装。需要安装的内容包括：
 
