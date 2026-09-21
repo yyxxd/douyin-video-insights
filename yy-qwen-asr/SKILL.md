@@ -1,11 +1,13 @@
 ---
-name: qwen-asr
+name: yy-qwen-asr
 description: 使用 Qwen ASR 将用户明确要求转写的音频或含音轨视频转换为文字，并在可用时输出句子级时间戳。口播、台词、旁白和视频语音转写应调用本 Skill；仅提供媒体文件不会自动调用。
 ---
 
 # Qwen ASR
 
-抖音分享链接或带原片截图的详细分镜由同级 `douyin-video` 编排。`--timestamps` 强制使用 Filetrans 并输出结构化 `segments`（秒单位、原始台词、句子 ID）；`--output <文件>` 保存 JSON 结果且拒绝覆盖已有文件。普通口播提取继续沿用默认路径。
+首次使用先读取同级 [首次配置引导](../yy-douyin-video/references/first-run.md)，默认配置下载和 AI 全部功能，允许只下载。缺依赖或未连接 AI 时由 Agent 带用户完成，不把安装命令、环境变量和密钥配置丢给用户。密钥通过本机页面输入；使用本机保存的费用偏好，配置后继续原任务。
+
+抖音分享链接或带原片截图的详细分镜由同级 `yy-douyin-video` 编排。`--timestamps` 强制使用 Filetrans 并输出结构化 `segments`（秒单位、原始台词、句子 ID）；`--output <文件>` 保存 JSON 结果且拒绝覆盖已有文件。普通口播提取继续沿用默认路径。
 
 当用户明确说“用 ASR 识别”“转写这个录音”“提取这个视频的口播稿”“把视频转成文字”“识别视频里的人说了什么”等，调用 `scripts/run_qwen_asr.mjs`。视频文件不应因为扩展名而自动调用 Qwen Omni；只要用户的意图是语音转写，就选择 Qwen ASR。仅提供音频或视频而没有处理要求时不要调用。
 

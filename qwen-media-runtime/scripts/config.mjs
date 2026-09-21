@@ -1,5 +1,7 @@
 import os from 'node:os';
 import path from 'node:path';
+import { readSettings } from './local_settings.mjs';
+import { aiEnvironment } from './ai_environment.mjs';
 
 export const DEFAULT_REGION = 'cn-beijing';
 export const DEFAULT_COMPATIBLE_BASE_URL = 'https://dashscope.aliyuncs.com/compatible-mode/v1';
@@ -53,6 +55,9 @@ function regionForBaseUrl(baseUrl) {
 }
 
 export function resolveConfig(env = process.env) {
+  const local = readSettings(env);
+  if (local.costMode === 'limit' && (!Number.isFinite(local.costLimit) || local.costLimit <= 0 || local.costLimit > 100)) throw new Error('保存的费用上限无效，请重新打开配置引导。');
+  const apiKey = env === process.env && local.environmentManaged ? aiEnvironment.userValue() : env.DASHSCOPE_API_KEY || (env === process.env ? aiEnvironment.value() : '') || '';
   const requestedRegion = env.QWEN_BAILIAN_REGION?.trim() || undefined;
   const requestedBase = env.QWEN_BAILIAN_BASE_URL?.trim().replace(/\/$/, '') || undefined;
   let region = requestedRegion;
@@ -76,8 +81,8 @@ export function resolveConfig(env = process.env) {
   if (configuredWorkspaceBase && derivedWorkspaceBase && configuredWorkspaceBase !== derivedWorkspaceBase) throw new Error('QWEN_BAILIAN_WORKSPACE_ID 与 QWEN_BAILIAN_WORKSPACE_BASE_URL 不匹配。');
   const workspaceBaseUrl = configuredWorkspaceBase || derivedWorkspaceBase;
   return {
-    apiKey: env.DASHSCOPE_API_KEY || '',
-    apiKeyPresent: Boolean(env.DASHSCOPE_API_KEY),
+    apiKey,
+    apiKeyPresent: Boolean(apiKey),
     region,
     baseUrl,
     endpoints,
@@ -85,7 +90,7 @@ export function resolveConfig(env = process.env) {
     workspaceBaseUrl,
     workspaceEndpoints: workspaceEndpoints(workspaceBaseUrl),
     workspaceEndpointAvailable: Boolean(workspaceBaseUrl),
-    thresholdCny: envNumber(env, 'QWEN_COST_CONFIRM_THRESHOLD_CNY', DEFAULT_THRESHOLD_CNY),
+    thresholdCny: local.costMode === 'always' ? 0 : local.costMode === 'limit' ? local.costLimit : envNumber(env, 'QWEN_COST_CONFIRM_THRESHOLD_CNY', DEFAULT_THRESHOLD_CNY),
     omniModel: env.QWEN_OMNI_MODEL || 'qwen3.8-omni-flash',
     asrModel: env.QWEN_ASR_MODEL || 'qwen3-asr-flash',
     asrLongModel: env.QWEN_ASR_LONG_MODEL || 'qwen3-asr-flash-filetrans',

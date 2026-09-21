@@ -10,6 +10,7 @@ import subprocess
 from urllib.parse import urlparse
 
 from playwright.async_api import async_playwright
+from browser_session import load_session
 
 
 def share_url(text):
@@ -110,11 +111,11 @@ def verify_video(file, expected_duration):
 
 async def download(args):
     url = share_url(args.share)
-    cookies = read_cookies(args.cookies)
+    cookies, channel = (read_cookies(args.cookies), 'chrome') if args.cookies else load_session()
     output = Path(args.out).resolve()
     output.mkdir(parents=True, exist_ok=False)
     async with async_playwright() as p:
-        options = {'channel': 'chrome', 'headless': True, 'args': ['--mute-audio']}
+        options = {'channel': channel, 'headless': True, 'args': ['--mute-audio']}
         if os.environ.get('HTTPS_PROXY'):
             options['proxy'] = {'server': os.environ['HTTPS_PROXY']}
         browser = await p.chromium.launch(**options)
@@ -136,8 +137,9 @@ async def download(args):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ('share', 'cookies', 'out'):
+    for name in ('share', 'out'):
         parser.add_argument(f'--{name}', required=True)
+    parser.add_argument('--cookies', help='可选：沿用手动导出的 JSON；通常自动使用已连接的抖音账号。')
     try:
         asyncio.run(download(parser.parse_args()))
     except Exception as error:

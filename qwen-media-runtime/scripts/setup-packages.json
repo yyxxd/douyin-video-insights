@@ -1,0 +1,5 @@
+{
+  "node": {"label":"运行工具", "url":"https://nodejs.org/dist/v22.23.2/node-v22.23.2-win-x64.zip", "sha256":"1177b4137ba5adaa56354ae40f1080c7450e8ae09cecb47da459d1c52ac99f97", "exe":"node.exe"},
+  "uv": {"label":"下载与安装助手", "url":"https://github.com/astral-sh/uv/releases/download/0.12.17/uv-x86_64-pc-windows-msvc.zip", "sha256":"a252121d5b59398fcb137c6ea448176459a44010f33f67e0072305a637119ca7", "exe":"uv.exe"},
+  "ffmpeg": {"label":"音视频处理工具", "url":"https://github.com/GyanD/codexffmpeg/releases/download/9.0.2/ffmpeg-9.0.2-essentials_build.zip", "sha256":"60f467265b1e312373dbcd92200c2618a74850f98d3d078e94296bb3fa2047ba", "exe":"ffmpeg.exe"}
+}

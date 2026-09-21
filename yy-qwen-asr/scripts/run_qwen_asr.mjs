@@ -10,6 +10,7 @@ import { chatCompletions, filetransSubmit, taskQuery, fetchResultJson } from '..
 import { uploadTemporary } from '../../qwen-media-runtime/scripts/temp_upload.mjs';
 import { resolveTaskId, loadTaskBudget, registerOperations, authorizeCurrentCost, startOperation, completeOperation, failOperation, cancelOpenOperations, finalizeTask } from '../../qwen-media-runtime/scripts/task_budget.mjs';
 import { RuntimeError, printError } from '../../qwen-media-runtime/scripts/errors.mjs';
+import { recordCapability } from '../../qwen-media-runtime/scripts/local_settings.mjs';
 
 import { asrSegments, requireTimestamps } from '../../qwen-media-runtime/scripts/asr_timeline.mjs';
 
@@ -105,6 +106,7 @@ async function main() {
     if (!task.supplied || options.finalizeTask) await finalizeTask(task.taskId);
   }
   const report = { skill: 'Qwen ASR', taskId: task.taskId, results, actualTotalCost: reliable ? total : null, estimatedTotalCost: plan.estimatedTotalCost };
+  recordCapability('asr', probes.map(probe => probe.route === 'long_filetrans' ? config.asrLongModel : config.asrModel));
   if (options.output) await fs.writeFile(path.resolve(options.output), JSON.stringify(report, null, 2), { flag: 'wx' });
   if (options.json || options.debug) console.log(JSON.stringify(report, null, 2)); else {
     const costText = reliable ? `约 ¥${total.toFixed(2)}` : plan.estimatedTotalCost !== null ? `约 ¥${plan.estimatedTotalCost.toFixed(2)}（估算）` : '费用暂无法可靠计算';

@@ -33,7 +33,7 @@ async function main() {
     await fs.mkdir(config.configDir, { recursive: true });
     await fs.writeFile(statePath(config), `${JSON.stringify({ initialized: true, runtimeVersion: '1.0.0', region: config.region, checkedAt: new Date().toISOString() }, null, 2)}\n`, 'utf8');
   }
-  const output = report.ready ? { ok: true, ...report } : { ok: false, ...report, next: '请安装缺失依赖或补充 DASHSCOPE_API_KEY 后再次运行初始化。' };
+  const output = report.ready ? { ok: true, ...report } : { ok: false, ...report, next: '请由 Agent 执行首次配置引导：先检查 setup.ps1 -Action Check，获得安装同意后 Install -Consent，再 Open 打开本机配置页。用户不需要手动安装或设置环境变量。' };
   console.log(json ? JSON.stringify(output) : JSON.stringify(output, null, 2));
   if (!report.ready) process.exitCode = 10;
 }

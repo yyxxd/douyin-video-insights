@@ -12,7 +12,7 @@
 | 为什么牙齿不好 | 15.51 秒 | 1080×1920 | 通过 |
 
 ```powershell
-uv run --no-project --with playwright==1.63.0 python douyin-video/scripts/download_browser.py --share "https://v.douyin.com/vWhV5lbQYFc/" --cookies "<你的JSON Cookie文件绝对路径>" --out "work/我的视频下载"
+uv run --no-project --with playwright==1.63.0 python yy-douyin-video/scripts/download_browser.py --share "https://v.douyin.com/vWhV5lbQYFc/" --cookies "<你的JSON Cookie文件绝对路径>" --out "work/我的视频下载"
 ```
 
 从仓库根目录执行；输出目录必须不存在。要求本机 Chrome、FFmpeg、FFprobe 和 uv。测试安装在 `work/download-research/.venv`，也可使用其中的 Python 直接运行。无需执行 `playwright install`，脚本调用系统 Chrome。
@@ -20,7 +20,7 @@ uv run --no-project --with playwright==1.63.0 python douyin-video/scripts/downlo
 下载结果包括 `video.mp4` 和不含 Cookie、媒体签名 URL 的 `download.json`。仅下载不调用 Qwen。后续如要分析：
 
 ```powershell
-node douyin-video/scripts/prepare_video.mjs --file "work/我的视频下载/video.mp4" --out "work/我的视频素材"
+node yy-douyin-video/scripts/prepare_video.mjs --file "work/我的视频下载/video.mp4" --out "work/我的视频素材"
 ```
 
 ## 已确认的原因

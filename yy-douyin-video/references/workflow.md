@@ -4,9 +4,9 @@
 
 ## 单模型模式
 
-analysis 调用 `qwen-omni/scripts/run_qwen_omni.mjs --file <task>/video.mp4 --prompt "用户分析要求" --task-id <id> --operation-id omni --output <task>/omni.json --json`。
+analysis 调用 `yy-qwen-omni/scripts/run_qwen_omni.mjs --file <task>/video.mp4 --prompt "用户分析要求" --task-id <id> --operation-id omni --output <task>/omni.json --json`。
 
-transcript 调用 `qwen-asr/scripts/run_qwen_asr.mjs --file <task>/audio.wav --task-id <id> --operation-id asr --output <task>/asr.json --json`。不要把 MP4 直接当音频送入短音频接口。
+transcript 调用 `yy-qwen-asr/scripts/run_qwen_asr.mjs --file <task>/audio.wav --task-id <id> --operation-id asr --output <task>/asr.json --json`。不要把 MP4 直接当音频送入短音频接口。
 
 ## 详细分镜
 
@@ -14,7 +14,7 @@ transcript 调用 `qwen-asr/scripts/run_qwen_asr.mjs --file <task>/audio.wav --t
 2. 读取 ASR Skill 后调用：
 
 ```text
-node <repo>/qwen-asr/scripts/run_qwen_asr.mjs --file <task>/audio.wav --timestamps --task-id <id> --operation-id asr --output <task>/asr.json --json
+node <repo>/yy-qwen-asr/scripts/run_qwen_asr.mjs --file <task>/audio.wav --timestamps --task-id <id> --operation-id asr --output <task>/asr.json --json
 ```
 
 `--timestamps` 强制选择 Filetrans，即使只有几秒也不退回无时间戳接口。根据 ASR Skill 的临时上传说明，在本次进程启用 `QWEN_ALLOW_UNVERIFIED_FILETRANS_LOCAL=1`；账号或服务变更后真实验证。输出的 `segments` 包含秒级 start/end、原文与 ID。此处“秒级”指单位为秒，精度取决于模型，不能声称帧级精确。
@@ -28,7 +28,7 @@ node <skill>/scripts/build_prompt.mjs --media <task>/media.json --asr <task>/asr
 无音轨时省略 `--asr`。提示词把语音时间线和候选切点作为数据，与视频一起交给 Omni：
 
 ```text
-node <repo>/qwen-omni/scripts/run_qwen_omni.mjs --file <task>/video.mp4 --prompt-file <task>/prompt.txt --task-id <id> --operation-id omni --output <task>/omni.json --json
+node <repo>/yy-qwen-omni/scripts/run_qwen_omni.mjs --file <task>/video.mp4 --prompt-file <task>/prompt.txt --task-id <id> --operation-id omni --output <task>/omni.json --json
 ```
 
 按 Omni Skill 的既有规则，临时上传时加 `--force-temp-upload`。需要费用确认时，只在获得具体金额授权后使用 `--confirm --approved-cost-ceiling <金额>`。普通结果里的 requiresConfirmation 不是成功分析。

@@ -10,6 +10,7 @@ import { chatCompletions } from '../../qwen-media-runtime/scripts/bailian_client
 import { uploadTemporary } from '../../qwen-media-runtime/scripts/temp_upload.mjs';
 import { resolveTaskId, loadTaskBudget, registerOperations, authorizeCurrentCost, startOperation, completeOperation, failOperation, cancelOpenOperations, finalizeTask } from '../../qwen-media-runtime/scripts/task_budget.mjs';
 import { RuntimeError, printError } from '../../qwen-media-runtime/scripts/errors.mjs';
+import { recordCapability } from '../../qwen-media-runtime/scripts/local_settings.mjs';
 
 const runtimeInit = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../qwen-media-runtime/scripts/init_qwen_media.mjs');
 const mime = (file) => ({ mp4: 'video/mp4', mov: 'video/quicktime', mkv: 'video/x-matroska', webm: 'video/webm' }[path.extname(file).slice(1).toLowerCase()] || 'video/mp4');
@@ -57,6 +58,7 @@ async function main() {
     if (!task.supplied || options.finalizeTask) await finalizeTask(task.taskId);
   }
   const report = { skill: 'Qwen Omni', taskId: task.taskId, results, actualTotalCost: actualReliable ? actualTotal : null, estimatedTotalCost: plan.estimatedTotalCost };
+  recordCapability('omni', config.omniModel);
   if (options.output) await fs.writeFile(path.resolve(options.output), JSON.stringify(report, null, 2), { flag: 'wx' });
   if (options.json || options.debug) console.log(JSON.stringify(report, null, 2)); else {
     const costText = actualReliable ? `约 ¥${actualTotal.toFixed(2)}` : plan.estimatedTotalCost !== null ? `约 ¥${plan.estimatedTotalCost.toFixed(2)}（估算）` : '费用暂无法可靠计算';
