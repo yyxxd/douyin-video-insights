@@ -4,3 +4,5 @@ node_modules/
 work/
 tmp/
 state.json
+__pycache__/
+*.pyc

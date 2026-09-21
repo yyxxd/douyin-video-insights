@@ -18,9 +18,9 @@ const durationText = (seconds) => `${Math.floor(seconds / 60)} 分 ${Math.round(
 function argsOf(args) {
   const files = []; let prompt = ''; const options = { confirm: false, json: false, debug: false, forceTempUpload: false, taskId: undefined, operationIds: [], approvedCostCeiling: undefined, finalizeTask: false };
   for (let index = 0; index < args.length; index += 1) {
-    if (args[index] === '--file') files.push(args[++index]); else if (args[index] === '--prompt') prompt = args[++index]; else if (args[index] === '--confirm') options.confirm = true; else if (args[index] === '--json') options.json = true; else if (args[index] === '--debug') options.debug = true; else if (args[index] === '--force-temp-upload') options.forceTempUpload = true; else if (args[index] === '--task-id') options.taskId = args[++index]; else if (args[index] === '--operation-id') options.operationIds.push(args[++index]); else if (args[index] === '--approved-cost-ceiling') options.approvedCostCeiling = Number(args[++index]); else if (args[index] === '--finalize-task') options.finalizeTask = true;
+    if (args[index] === '--prompt-file') options.promptFile = args[++index]; else if (args[index] === '--output') options.output = args[++index]; else if (args[index] === '--file') files.push(args[++index]); else if (args[index] === '--prompt') prompt = args[++index]; else if (args[index] === '--confirm') options.confirm = true; else if (args[index] === '--json') options.json = true; else if (args[index] === '--debug') options.debug = true; else if (args[index] === '--force-temp-upload') options.forceTempUpload = true; else if (args[index] === '--task-id') options.taskId = args[++index]; else if (args[index] === '--operation-id') options.operationIds.push(args[++index]); else if (args[index] === '--approved-cost-ceiling') options.approvedCostCeiling = Number(args[++index]); else if (args[index] === '--finalize-task') options.finalizeTask = true;
   }
-  if (!files.length || !prompt) throw new RuntimeError('用法：run_qwen_omni.mjs --file <path> --prompt <需求> [--task-id <id>] [--confirm]', 'USAGE');
+  if (!files.length || (!prompt && !options.promptFile)) throw new RuntimeError('用法：run_qwen_omni.mjs --file <path> --prompt <需求> [--task-id <id>] [--confirm]', 'USAGE');
   return { files, prompt, options };
 }
 
@@ -31,7 +31,7 @@ function runInit() {
 async function encodeVideo(file) { const data = await fs.readFile(file); return `data:${mime(file)};base64,${data.toString('base64')}`; }
 
 async function main() {
-  const { files, prompt, options } = argsOf(process.argv.slice(2)); const init = await runInit(); if (!init.report.ok) throw new RuntimeError(`环境尚未准备完成：${init.report.next || init.report.error}`, 'NOT_INITIALIZED');
+  const { files, prompt: inlinePrompt, options } = argsOf(process.argv.slice(2)); const prompt = options.promptFile ? await fs.readFile(path.resolve(options.promptFile), 'utf8') : inlinePrompt; if (!prompt.trim()) throw new RuntimeError('分析要求不能为空。', 'USAGE'); const init = await runInit(); if (!init.report.ok) throw new RuntimeError(`环境尚未准备完成：${init.report.next || init.report.error}`, 'NOT_INITIALIZED');
   const config = resolveConfig(); const task = resolveTaskId(options.taskId); const probes = await Promise.all(files.map((file) => probeMedia(file, 'omni')));
   const plan = buildTaskPlan(probes.map((probe) => ({ kind: 'omni', probe, prompt })), config); const operationIds = plan.operations.map((_, index) => options.operationIds[index] || `omni-${randomUUID()}`);
   await registerOperations(task.taskId, plan.operations.map((operation, index) => ({ operationId: operationIds[index], skill: 'Qwen Omni', model: config.omniModel, estimatedCost: operation.estimate.reliable ? operation.estimate.estimatedCost : null })), config);
@@ -57,6 +57,7 @@ async function main() {
     if (!task.supplied || options.finalizeTask) await finalizeTask(task.taskId);
   }
   const report = { skill: 'Qwen Omni', taskId: task.taskId, results, actualTotalCost: actualReliable ? actualTotal : null, estimatedTotalCost: plan.estimatedTotalCost };
+  if (options.output) await fs.writeFile(path.resolve(options.output), JSON.stringify(report, null, 2), { flag: 'wx' });
   if (options.json || options.debug) console.log(JSON.stringify(report, null, 2)); else {
     const costText = actualReliable ? `约 ¥${actualTotal.toFixed(2)}` : plan.estimatedTotalCost !== null ? `约 ¥${plan.estimatedTotalCost.toFixed(2)}（估算）` : '费用暂无法可靠计算';
     console.log(`已调用：Qwen Omni\n${results.map((result) => `视频时长：${durationText(result.durationSeconds)}`).join('\n')}\n本次花费：${costText}`); for (const result of results) console.log(`\n${result.content}`);

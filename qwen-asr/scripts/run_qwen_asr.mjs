@@ -11,6 +11,8 @@ import { uploadTemporary } from '../../qwen-media-runtime/scripts/temp_upload.mj
 import { resolveTaskId, loadTaskBudget, registerOperations, authorizeCurrentCost, startOperation, completeOperation, failOperation, cancelOpenOperations, finalizeTask } from '../../qwen-media-runtime/scripts/task_budget.mjs';
 import { RuntimeError, printError } from '../../qwen-media-runtime/scripts/errors.mjs';
 
+import { asrSegments, requireTimestamps } from '../../qwen-media-runtime/scripts/asr_timeline.mjs';
+
 const runtimeInit = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../qwen-media-runtime/scripts/init_qwen_media.mjs');
 const durationText = (seconds) => `${Math.floor(seconds / 60)} 分 ${Math.round(seconds % 60)} 秒`;
 const mime = (file) => ({ mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4', mp4: 'audio/mp4', aac: 'audio/aac', flac: 'audio/flac', ogg: 'audio/ogg' }[path.extname(file).slice(1).toLowerCase()] || 'application/octet-stream');
@@ -18,7 +20,7 @@ const mime = (file) => ({ mp3: 'audio/mpeg', wav: 'audio/wav', m4a: 'audio/mp4',
 function parseArgs(args) {
   const files = []; const options = { confirm: false, json: false, debug: false, language: undefined, itn: true, taskId: undefined, operationIds: [], approvedCostCeiling: undefined, finalizeTask: false };
   for (let index = 0; index < args.length; index += 1) {
-    if (args[index] === '--file') files.push(args[++index]); else if (args[index] === '--confirm') options.confirm = true; else if (args[index] === '--json') options.json = true; else if (args[index] === '--debug') options.debug = true; else if (args[index] === '--language') options.language = args[++index]; else if (args[index] === '--no-itn') options.itn = false; else if (args[index] === '--task-id') options.taskId = args[++index]; else if (args[index] === '--operation-id') options.operationIds.push(args[++index]); else if (args[index] === '--approved-cost-ceiling') options.approvedCostCeiling = Number(args[++index]); else if (args[index] === '--finalize-task') options.finalizeTask = true;
+    if (args[index] === '--timestamps') options.timestamps = true; else if (args[index] === '--output') options.output = args[++index]; else if (args[index] === '--file') files.push(args[++index]); else if (args[index] === '--confirm') options.confirm = true; else if (args[index] === '--json') options.json = true; else if (args[index] === '--debug') options.debug = true; else if (args[index] === '--language') options.language = args[++index]; else if (args[index] === '--no-itn') options.itn = false; else if (args[index] === '--task-id') options.taskId = args[++index]; else if (args[index] === '--operation-id') options.operationIds.push(args[++index]); else if (args[index] === '--approved-cost-ceiling') options.approvedCostCeiling = Number(args[++index]); else if (args[index] === '--finalize-task') options.finalizeTask = true;
   }
   if (!files.length) throw new RuntimeError('用法：run_qwen_asr.mjs --file <path> [--language zh] [--task-id <id>] [--confirm]', 'USAGE');
   return { files, options };
@@ -66,11 +68,16 @@ async function filetrans(config, probe) {
 }
 
 function transcriptFrom(response) { const content = response.choices?.[0]?.message?.content; if (typeof content === 'string') return content; return JSON.stringify(content || response); }
-function timestamped(response) { const sentences = response.transcripts?.flatMap((item) => item.sentences || []) || response.output?.sentences || []; return sentences.length ? sentences.map((item) => `[${item.begin_time ?? item.beginTime}ms-${item.end_time ?? item.endTime}ms] ${item.text}`).join('\n') : transcriptFrom(response); }
+function timestamped(response) {
+  const sentences = response.transcripts?.flatMap((item) => item.sentences || []) || response.output?.sentences || [];
+  if (sentences.length) return sentences.map((item) => `[${item.begin_time ?? item.beginTime}ms-${item.end_time ?? item.endTime}ms] ${item.text}`).join('\n');
+  return Array.isArray(response.transcripts) ? response.transcripts.map((item) => item.text || '').join('\n') : transcriptFrom(response);
+}
 
 async function main() {
   const { files, options } = parseArgs(process.argv.slice(2)); const init = await runInit(); if (!init.report.ok) throw new RuntimeError(`环境尚未准备完成：${init.report.next || init.report.error}`, 'NOT_INITIALIZED');
   const config = resolveConfig(); const task = resolveTaskId(options.taskId); const probes = await Promise.all(files.map((file) => probeMedia(file, 'asr')));
+  if (options.timestamps) for (const probe of probes) { if (probe.route === 'unsupported') throw new RuntimeError('媒体超出转写限制。', 'ASR_UNSUPPORTED'); probe.route = 'long_filetrans'; }
   const plan = buildTaskPlan(probes.map((probe) => ({ kind: 'asr', probe })), config); const operationIds = plan.operations.map((_, index) => options.operationIds[index] || `asr-${randomUUID()}`);
   await registerOperations(task.taskId, plan.operations.map((operation, index) => ({ operationId: operationIds[index], skill: 'Qwen ASR', model: operation.probe.route === 'long_filetrans' ? config.asrLongModel : config.asrModel, estimatedCost: operation.estimate.reliable ? operation.estimate.estimatedCost : null })), config);
   const budget = await loadTaskBudget(task.taskId, config); const projected = budget.actualCost + budget.pendingEstimatedCost; const requiresConfirmation = !plan.reliable || projected > (budget.approvedCostCeiling ?? budget.autoThresholdCny);
@@ -90,12 +97,15 @@ async function main() {
         else throw new RuntimeError('当前音频超出已实现的本地输入限制，请提供符合官方限制的文件或公网 URL。', 'ASR_UNSUPPORTED');
       } catch (error) { await failOperation(task.taskId, operationId, null, config); throw error; }
       const cost = actualCost('asr', response.usage, probe, config); reliable &&= cost.reliable; if (cost.reliable) total += cost.cost; await completeOperation(task.taskId, operationId, cost.reliable ? cost.cost : null, config);
-      results.push({ durationSeconds: probe.durationSeconds, text: probe.route === 'long_filetrans' ? timestamped(response) : transcriptFrom(response), usage: response.usage, route: probe.route });
+      const segments = probe.route === 'long_filetrans' ? asrSegments(response) : [];
+      if (options.timestamps) requireTimestamps(segments, response.transcripts?.map((item) => item.text || '').join('') || response.output?.text || '');
+      results.push({ segments, durationSeconds: probe.durationSeconds, text: probe.route === 'long_filetrans' ? timestamped(response) : transcriptFrom(response), usage: response.usage, route: probe.route });
     }
   } finally {
     if (!task.supplied || options.finalizeTask) await finalizeTask(task.taskId);
   }
   const report = { skill: 'Qwen ASR', taskId: task.taskId, results, actualTotalCost: reliable ? total : null, estimatedTotalCost: plan.estimatedTotalCost };
+  if (options.output) await fs.writeFile(path.resolve(options.output), JSON.stringify(report, null, 2), { flag: 'wx' });
   if (options.json || options.debug) console.log(JSON.stringify(report, null, 2)); else {
     const costText = reliable ? `约 ¥${total.toFixed(2)}` : plan.estimatedTotalCost !== null ? `约 ¥${plan.estimatedTotalCost.toFixed(2)}（估算）` : '费用暂无法可靠计算';
     console.log(`已调用：Qwen ASR\n${results.map((result) => `音频时长：${durationText(result.durationSeconds)}`).join('\n')}\n本次花费：${costText}`); for (const result of results) console.log(`\n${result.text}`);

@@ -5,6 +5,8 @@ description: 使用 Qwen ASR 将用户明确要求转写的音频或含音轨视
 
 # Qwen ASR
 
+抖音分享链接或带原片截图的详细分镜由同级 `douyin-video` 编排。`--timestamps` 强制使用 Filetrans 并输出结构化 `segments`（秒单位、原始台词、句子 ID）；`--output <文件>` 保存 JSON 结果且拒绝覆盖已有文件。普通口播提取继续沿用默认路径。
+
 当用户明确说“用 ASR 识别”“转写这个录音”“提取这个视频的口播稿”“把视频转成文字”“识别视频里的人说了什么”等，调用 `scripts/run_qwen_asr.mjs`。视频文件不应因为扩展名而自动调用 Qwen Omni；只要用户的意图是语音转写，就选择 Qwen ASR。仅提供音频或视频而没有处理要求时不要调用。
 
 执行顺序：

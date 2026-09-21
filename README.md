@@ -42,6 +42,7 @@ https://github.com/yyxxd/qwen-media-skills
 
 请先判断你当前支持哪种 Skill、工具或脚本安装方式，再选择兼容的方式安装。需要安装的内容包括：
 
+- douyin-video：抖音视频下载、内容分析与图文分镜编排
 - qwen-asr：音频和视频语音转写
 - qwen-omni：视频理解、总结和分镜分析
 - qwen-media-runtime：两个 Skill 共用的运行时
@@ -67,11 +68,16 @@ https://github.com/yyxxd/qwen-media-skills
 
 ## 包含哪些内容？
 
+- `douyin-video/`：抖音链接获取与意图编排、带时间戳的图文分镜、原片截图和 HTML/Markdown 报告
 - `qwen-asr/`：语音转写能力
 - `qwen-omni/`：视频理解能力
 - `qwen-media-runtime/`：共享运行时、媒体检测、费用控制和上传处理
 
 ## 使用前准备
+
+抖音下载优先使用独立 Chrome + Playwright，需 Chrome、Python、uv、FFmpeg、FFprobe 和用户提供的 JSON Cookie；yt-dlp 为可选入口。仅下载不需要模型 API Key。命令见 [douyin-video/SKILL.md](douyin-video/SKILL.md)。`douyin-video` 与下列三个目录必须保持同级。可直接说“分析这个抖音链接”“提取口播稿”或“生成带原片截图的详细分镜”。详细分镜按 ASR 时间线 → Omni 画面分析 → FFmpeg 截图 → 图文报告执行；支持本地视频作为输入。
+
+2026-09-21：浏览器入口已通过四个真实分享链接的完整下载、时长核对和全片解码验收，均为 1080×1920 且带音轨。此结果不代表所有链接永久可用，也不代表真实视频的模型还原质量已验收。详见 [下载方案验证](douyin-video/references/download-validation.md)。
 
 需要准备 Node.js 18+、FFmpeg、FFprobe 和阿里云百炼 DashScope API Key。
 
