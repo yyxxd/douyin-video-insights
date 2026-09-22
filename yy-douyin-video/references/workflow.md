@@ -60,7 +60,7 @@ node <skill>/scripts/render_storyboard.mjs --media <task>/media.json --asr <task
 
 后续浏览器路线已使四个真实分享样例全部下载并通过全片解码（1080×1920，带音轨）；当前下载入口与详细证据见 [download-validation.md](download-validation.md)。这只更新下载验收，不代表这四个样例的模型分析、转写或分镜质量已验收。
 
-2026-09-21 最新实测：yt-dlp 2026.08.19 携带用户 JSON 转换的 Netscape Cookie，第二个样例（7686769474703347007，54.93 秒）和第三个样例（7627428410046552290，28.57 秒）下载成功，均为 720×1280，通过 FFmpeg 全片解码及本地素材准备。第一个样例（7684213955167084657）初次及一次重试均在详情接口返回 HTTP 403。后续通过 JSON Cookie 入口再次请求第二个样例也返回 403，尚不能证明在线入口稳定；Cookie 转换和失败清理测试、本地 workflow 测试通过。三个样例全部下载的验收条件未满足，不应宣称下载 Skill 已完成真实验收。此前 Chrome Cookie 数据库复制失败；不自动读取其他浏览器凭据。
+2026-09-21 历史实测（改造前）：yt-dlp 2026.08.19 携带用户 JSON 转换的 Netscape Cookie，第二个样例（7686769474703347007，54.93 秒）和第三个样例（7627428410046552290，28.57 秒）下载成功，均为 720×1280，通过 FFmpeg 全片解码及本地素材准备。第一个样例（7684213955167084657）初次及一次重试均在详情接口返回 HTTP 403。后续通过 JSON Cookie 入口再次请求第二个样例也返回 403，尚不能证明在线入口稳定；Cookie 转换和失败清理测试、本地 workflow 测试通过。三个样例全部下载的验收条件未满足，不应宣称下载 Skill 已完成真实验收。此前 Chrome Cookie 数据库复制失败；不自动读取其他浏览器凭据。
 
 Filetrans 时间戳格式参考：https://help.aliyun.com/zh/model-studio/qwen-asr-api-reference
 下载工具参考：https://github.com/yt-dlp/yt-dlp

@@ -77,7 +77,7 @@ https://github.com/yyxxd/douyin-video-insights
 
 ## 使用前准备
 
-抖音下载优先使用独立 Chrome + Playwright，需 Chrome、Python、uv、FFmpeg、FFprobe ，由首次引导自动准备并连接抖音；不需要用户导出 Cookie。yt-dlp 为可选入口。仅下载不需要模型 API Key。命令见 [yy-douyin-video/SKILL.md](yy-douyin-video/SKILL.md)。`yy-douyin-video` 与下列三个目录必须保持同级。可直接说“分析这个抖音链接”“提取口播稿”或“生成带原片截图的详细分镜”。详细分镜按 ASR 时间线 → Omni 画面分析 → FFmpeg 截图 → 图文报告执行；支持本地视频作为输入。
+抖音下载优先使用 yt-dlp，失败自动转独立 Chrome / Edge + Playwright，需 Chrome / Edge、Python、uv、FFmpeg、FFprobe ，由首次引导自动准备并连接抖音；不需要用户导出 Cookie。两条路线复用配置保存的登录；均失败时说明原因并引导手动下载。分析用途默认 720p；主动下载未指定画质时先询问 720p、1080p 或最高可用画质。仅下载不需要模型 API Key。命令见 [yy-douyin-video/SKILL.md](yy-douyin-video/SKILL.md)。`yy-douyin-video` 与下列三个目录必须保持同级。可直接说“分析这个抖音链接”“提取口播稿”或“生成带原片截图的详细分镜”。详细分镜按 ASR 时间线 → Omni 画面分析 → FFmpeg 截图 → 图文报告执行；支持本地视频作为输入。
 
 2026-09-21：浏览器入口已通过四个真实分享链接的完整下载、时长核对和全片解码验收，均为 1080×1920 且带音轨。此结果不代表所有链接永久可用，也不代表真实视频的模型还原质量已验收。详见 [下载方案验证](yy-douyin-video/references/download-validation.md)。
 

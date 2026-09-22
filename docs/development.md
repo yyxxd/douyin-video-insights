@@ -10,7 +10,7 @@
 | Playwright | requirements.in 指定直接依赖，requirements.lock 锁定传递依赖和 SHA256 |
 | FFmpeg / FFprobe | 必须成对可用；安装器与 CI 共用固定版本及哈希 |
 | Chrome / Edge | 仅抖音浏览器操作需要；本地模型离线测试不需要登录 |
-| yt-dlp | 可选兼容入口，不是默认下载链路 |
+| yt-dlp | 默认首选下载路线，失败自动转浏览器；专用 Python 环境锁定安装 |
 
 ```powershell
 pnpm install --frozen-lockfile --ignore-scripts

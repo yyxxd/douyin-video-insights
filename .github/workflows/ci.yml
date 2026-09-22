@@ -23,6 +23,7 @@ jobs:
         run: |
           uv venv "$env:RUNNER_TEMP/qwen-python"
           uv pip sync --python "$env:RUNNER_TEMP/qwen-python/Scripts/python.exe" --require-hashes qwen-media-runtime/requirements.lock
+          "QWEN_MEDIA_PYTHON=$env:RUNNER_TEMP/qwen-python/Scripts/python.exe" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
       - name: Check and offline tests
         shell: pwsh
         run: |

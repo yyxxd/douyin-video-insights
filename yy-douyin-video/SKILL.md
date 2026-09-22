@@ -1,6 +1,6 @@
 ---
 name: yy-douyin-video
-description: 带用户自动安装配置、连接抖音和 AI 服务，使用独立浏览器下载抖音分享视频，或根据分享链接、本地视频调用 Qwen Omni 分析内容、Qwen ASR 提取口播，组合时间戳转写、画面分析与原片截图生成详细图文分镜还原稿。普通本地转写或摘要沿用 yy-qwen-asr、yy-qwen-omni。
+description: 带用户自动安装配置、连接抖音和 AI 服务，优先使用 yt-dlp、失败后自动转独立浏览器下载抖音分享视频，或根据分享链接、本地视频调用 Qwen Omni 分析内容、Qwen ASR 提取口播，组合时间戳转写、画面分析与原片截图生成详细图文分镜还原稿。普通本地转写或摘要沿用 yy-qwen-asr、yy-qwen-omni。
 ---
 
 # 抖音视频下载、分析与图文分镜
@@ -11,9 +11,9 @@ description: 带用户自动安装配置、连接抖音和 AI 服务，使用独
 
 首次配置优先支持 Windows x64 + 本机 Agent + Chrome / Edge。安装许可、抖音连接许可、密钥保存和费用授权分别遵循已获准范围，不自动勾选同意。不要求密钥进入聊天；用户主动提供 JSON Cookie 时仍可走下方兼容入口。
 
-本 Skill 负责编排，依赖同级 `yy-qwen-asr`、`yy-qwen-omni`、`qwen-media-runtime`；保持四个目录的相对位置。分析编排需要 Node.js、FFmpeg、FFprobe。仅浏览器下载需要 Chrome、Python、Playwright、FFmpeg、FFprobe，示例使用 uv 管理依赖；yt-dlp 仅为可选入口。按照用户意图执行，不因收到链接就自动调用模型。
+本 Skill 负责编排，依赖同级 `yy-qwen-asr`、`yy-qwen-omni`、`qwen-media-runtime`；保持四个目录的相对位置。下载需要 Python、yt-dlp、FFmpeg、FFprobe；浏览器回退使用 Playwright 和配置中选择的 Chrome / Edge，由首次引导准备。分析编排还需要 Node.js。按照用户意图执行，不因收到链接就自动调用模型。
 
-抖音链接优先使用下方已实测的独立 Chrome 下载入口（需本机 Chrome、Python 与 Playwright）；yt-dlp 保留为可选入口。浏览器入口不需要安装 AIX，也不读取正在使用的浏览器配置。
+抖音链接统一执行 yt-dlp → 独立浏览器 → 人工接管，每条路线执行一轮。自动复用配置时保存的加密登录，不读取日常浏览器凭据。成功下载并校验后立即停止，不再启动另一条路线比较画质。
 
 ## 选择流程
 
@@ -30,27 +30,40 @@ description: 带用户自动安装配置、连接抖音和 AI 服务，使用独
 
 每个视频使用新的任务目录，如 `<工作区>/work/<任务名>`，不在 Skill 安装目录保存媒体或凭据。
 
-通常使用首次引导保存的登录，由 setup.ps1 的 Run 入口自动调用下载。用户主动提供 JSON Cookie 时，可使用兼容入口：
+先确定用途和分辨率：
+
+| 用途 | 执行规则 |
+| --- | --- |
+| ASR、Omni、分镜分析 | 默认 720p，不额外询问 |
+| 用户要求下载并指定画质 | 使用指定画质 |
+| 用户要求下载但没说画质 | 先询问 720p、1080p、最高可用画质，再执行 |
+| 下载并分析 | 按用户选择保存交付视频，再用本地文件生成 720p 分析素材，不重复下载 |
+
+720p / 1080p 按短边计算，保持宽高比。优先对应原生版本，只有更高清版本时缩小。分析源不足 720p 时保留原画质并说明；主动下载不可静默降级。最高画质表示当前成功路线能取得的最高画质，不承诺平台原始画质。
+
+通常由 `setup.ps1 -Action Run -Task download` 调用统一下载，沿用加密登录。参数示例：
 
 ```text
-uv run --no-project --with playwright==1.63.0 python <skill>/scripts/download_browser.py --share "完整分享文案或链接" --cookies <JSON文件> --out <新下载目录>
+python <skill>/scripts/download_video.py --share "分享文案或链接" --purpose download --resolution 1080 --out <新下载目录>
+python <skill>/scripts/download_video.py --share "分享文案或链接" --purpose analysis --out <新下载目录>
 ```
 
-启动独立无头 Chrome 会话，导入用户提供的 Cookie，等待页面播放，从页面详情响应取得对应视频的完整播放地址。下载后核对作品 ID、时长并全片解码，成功才生成 `video.mp4` 和 `download.json`。不会保存浏览器登录配置或 Cookie 副本；继承 `HTTPS_PROXY`。需要验证码或登录交互时报告失败，不自动绕过挑战。
+Python 必须使用配置 toolchain.json 中的专用解释器；直接调用时 FFmpeg、FFprobe 必须在当前进程 PATH 中。`--resolution` 支持 `720|1080|best`。主动下载缺少画质返回 `RESOLUTION_REQUIRED`，Agent 按选项询问，不猜测。`QUALITY_UNAVAILABLE` 时告知 `availableResolutions` 中的已知画质供用户选择；没有选项时说明尚未取得可用画质。
 
-只下载时直接交付；需要分析、转写时再用下面的 `--file <下载目录>/video.mp4` 准备素材，使用不同输出目录。浏览器播放使用的媒体可能是短分片，不允许拿首次捕获的 MP4 响应直接当完整视频。`allow_download=false` 与详情接口 HTTP 403 不是同一个判断条件。实测比较与执行方案见 [下载方案验证](references/download-validation.md)。
+成功生成 `video.mp4` 和 `download.json`，核对作品 ID、时长、音轨情况与全片解码。失败生成 `download-error.json`，stdout 返回结构化错误和各路线原因；不得交付临时文件。已存在输出目录不覆盖。进度在 stderr，结果在 stdout。旧 `download_browser.py` 命令入口也转交统一策略。
+
+只下载时直接交付视频与实际分辨率，不调用模型。需要分析、转写时使用 prepare（分享链接默认分析用途和 720p）：
 
 ```text
-node <skill>/scripts/prepare_video.mjs --share "完整分享文案或链接" --out <任务目录>
-node <skill>/scripts/prepare_video.mjs --share "分享链接" --cookies <Cookie文件> --out <任务目录>
-node <skill>/scripts/prepare_video.mjs --file <本地视频> --out <任务目录>
+node <skill>/scripts/prepare_video.mjs --share "分享链接" --out <任务目录>
+node <skill>/scripts/prepare_video.mjs --file <本地视频> --resolution 720 --out <新分析目录>
 ```
 
-工具下载并验证视频，生成 `video.mp4`、有音轨时生成 `audio.wav`，并写入 `media.json`（时长、绝对路径、候选切点）。转码保留内容与时间关系，截图来自视频解码画面，不生成替代图。
+本地 `--file` 不指定分辨率时保持原处理行为。工具生成 `video.mp4`、有音轨时生成 `audio.wav`，并写入含时长、路径、候选切点的 `media.json`。截图来自视频解码画面，不生成替代图。
 
-仅下载时，准备成功后交付视频文件，不调用模型。多个链接逐个处理，分别报告成功与失败，不因部分成功宣称全部完成。
+`--cookies <文件>` 兼容 Netscape 和 JSON，仅覆盖本次任务。`--browser chrome|edge|firefox` 仅在用户明确要求读取该浏览器登录时使用，不能与 cookies 同用；默认不启用。临时凭据在任务结束时清理，不修改原凭据。不要输出 Cookie、媒体签名 URL，或关闭用户日常浏览器。
 
-下载失败后只允许一次有依据的重试；用户明确授权浏览器时才加 `--browser chrome|edge|firefox`。`--cookies <文件>` 支持 Netscape 格式和浏览器导出的 JSON 数组，不能与 browser 同用。JSON 仅保留抖音域 Cookie；脚本创建临时 Netscape 副本，结束时清理，不修改原凭据文件。不得输出 Cookie、提交凭据或发送给替代域名。不要自动关闭浏览器或读取其他浏览器凭据。HTTP 403 或 yt-dlp 的 Fresh cookies 提示不能单独证明 Cookie 过期；如实报告接口失败，无法访问时改用用户本地视频，不能拿标题冒充视频分析。详细流程见 [workflow.md](references/workflow.md)。
+两条路线都失败后，分别说明原因，指导用户在浏览器打开作品、手动下载，再提供本地视频路径继续原任务。不得自行循环重试或自动绕过验证码。HTTP 403 或 Fresh cookies 提示不能单独证明登录过期；未知原因如实说明。多个链接逐个处理，分别报告结果。历史证据见 [下载方案验证](references/download-validation.md)，后续分析见 [workflow.md](references/workflow.md)。
 
 ## 费用与模型
 
