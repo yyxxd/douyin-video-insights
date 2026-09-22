@@ -5,7 +5,7 @@ description: 使用 Qwen ASR 将用户明确要求转写的音频或含音轨视
 
 # Qwen ASR
 
-首次使用先读取同级 [首次配置引导](../yy-douyin-video/references/first-run.md)，默认配置下载和 AI 全部功能，允许只下载。缺依赖或未连接 AI 时由 Agent 带用户完成，不把安装命令、环境变量和密钥配置丢给用户。密钥通过本机页面输入；使用本机保存的费用偏好，配置后继续原任务。
+安装时读取同级 [首次配置引导](../yy-douyin-video/references/first-run.md) 并完成统一引导；手动复制安装时由第一次实际任务兜底。缺依赖或未连接 AI 时由 Agent 运行 `setup.ps1 -Action Guide -Consent`，不把命令、环境变量和密钥配置丢给用户。密钥在本机页面验证成功后才保存；引导完成后自动继续原任务。
 
 抖音分享链接或带原片截图的详细分镜由同级 `yy-douyin-video` 编排。`--timestamps` 强制使用 Filetrans 并输出结构化 `segments`（秒单位、原始台词、句子 ID）；`--output <文件>` 保存 JSON 结果且拒绝覆盖已有文件。普通口播提取继续沿用默认路径。
 
