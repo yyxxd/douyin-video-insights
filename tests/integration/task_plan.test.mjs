@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
-import { taskPaths, loadTaskBudget, registerOperations, startOperation, completeOperation, authorizeCurrentCost, cancelOpenOperations, finalizeTask } from './task_budget.mjs';
+import { taskPaths, loadTaskBudget, registerOperations, startOperation, completeOperation, authorizeCurrentCost, cancelOpenOperations, finalizeTask } from '../../qwen-media-runtime/scripts/task_budget.mjs';
 
 const config = { thresholdCny: 0.5 };
 const id = () => `test-${randomUUID()}`;

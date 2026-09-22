@@ -1,0 +1,33 @@
+name: Offline validation
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install pinned media tools
+        shell: pwsh
+        run: ./scripts/ci-tools.ps1
+      - name: Verify locked Python environment
+        shell: pwsh
+        run: |
+          uv venv "$env:RUNNER_TEMP/qwen-python"
+          uv pip sync --python "$env:RUNNER_TEMP/qwen-python/Scripts/python.exe" --require-hashes qwen-media-runtime/requirements.lock
+      - name: Check and offline tests
+        shell: pwsh
+        run: |
+          node scripts/check.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/test.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          node scripts/check-package.mjs

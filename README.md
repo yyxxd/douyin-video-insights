@@ -91,6 +91,14 @@ $env:DASHSCOPE_API_KEY = "your-api-key"
 
 ## 技术说明
 
+### 项目结构与开发
+
+本机运行要求 Node.js 22+。三个 Skill 和共享 runtime 保持同级；公开命令在 `scripts/`，业务模块在 `src/`，离线测试在根 `tests/`。本地 ASR/Omni 无需先登录抖音，统一配置页仍可用于完整首次安装。
+
+开发者执行 `pnpm check`、`pnpm test`；发布前执行 `pnpm check:package`，验证 ZIP 解压后的完整离线流程。Python 依赖使用带 SHA256 的锁文件，发布包使用逐文件白名单和校验清单。
+
+详见 [架构](docs/architecture.md)、[开发与恢复](docs/development.md)、[发布规则](docs/release.md) 和 [变更记录](CHANGELOG.md)。
+
 ### 意图路由
 
 - 转写、口播、台词、旁白 → Qwen ASR
@@ -107,6 +115,8 @@ $env:DASHSCOPE_API_KEY = "your-api-key"
 ### 费用控制
 
 多个能力可以共享同一个任务预算。运行时会先估算费用，再决定是否自动执行，避免每个 Skill 各自使用独立预算。
+
+同一个 Operation 只允许启动一次，任务归档后不能复用旧 Task ID。费用未知的失败会保留估算占用，不当作实际账单。模型调用前检查输出路径，批量中断会保留已完成的部分结果。
 
 ### 输出安全
 

@@ -2,14 +2,15 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
-import { readSettings, writeSettings, saveSecret, readSecret } from './local_settings.mjs';
-import { createAIEnvironment } from './ai_environment.mjs';
-import { guideState, verifyAIKey } from './setup_state.mjs';
-import { resolveConfig } from './config.mjs';
-import { registerOperations, startOperation, cancelOpenOperations, finalizeTask } from './task_budget.mjs';
+import { readSettings, writeSettings, saveSecret, readSecret } from '../../qwen-media-runtime/src/local_settings.mjs';
+import { createAIEnvironment } from '../../qwen-media-runtime/src/ai_environment.mjs';
+import { guideState, verifyAIKey } from '../../qwen-media-runtime/src/setup_state.mjs';
+import { resolveConfig } from '../../qwen-media-runtime/src/config.mjs';
+import { registerOperations, startOperation, cancelOpenOperations, finalizeTask } from '../../qwen-media-runtime/scripts/task_budget.mjs';
 
 const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'media-setup-test-'));
 const env = { ...process.env, QWEN_MEDIA_CONFIG_DIR: directory, DASHSCOPE_API_KEY: 'test-key-never-used-for-network' };
@@ -18,6 +19,11 @@ saveSecret('douyin-session', sample, env);
 assert.equal(readSecret('douyin-session', env), sample);
 assert.ok(!fs.readFileSync(path.join(directory, 'douyin-session.protected'), 'utf8').includes(sample));
 writeSettings({ mode: 'all', costMode: 'always' }, env);
+writeSettings({ privateField: 'private-field-must-not-reach-browser' }, env);
+fs.writeFileSync(path.join(directory, 'setup.json.lock'), String(process.pid));
+assert.throws(() => writeSettings({ mode: 'download' }, env), /写入|锁/);
+fs.unlinkSync(path.join(directory, 'setup.json.lock'));
+assert.equal(readSettings(env).mode, 'all');
 assert.equal(resolveConfig(env).thresholdCny, 0);
 assert.equal(resolveConfig(env).apiKey, sample);
 const taskId = `setup-test-${Date.now()}`;
@@ -52,7 +58,7 @@ await assert.rejects(verifyAIKey('limited', async () => new Response('{}', { sta
 await assert.rejects(verifyAIKey('malformed', async () => new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } })), /格式异常/);
 await assert.rejects(verifyAIKey('offline', async () => { throw new Error('offline'); }), /无法连接/);
 
-const script = fileURLToPath(new URL('./setup-server.mjs', import.meta.url));
+const script = fileURLToPath(new URL('../../qwen-media-runtime/scripts/setup-server.mjs', import.meta.url));
 const child = spawn(process.execPath, [script, '--no-open'], { env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
 try {
   const url = await new Promise((resolve, reject) => {
@@ -72,6 +78,7 @@ try {
   const response = await fetch(`${target.origin}/status`, { headers });
   const state = await response.text();
   assert.ok(!state.includes(sample));
+  assert.ok(!state.includes('private-field-must-not-reach-browser'));
   assert.equal(JSON.parse(state).aiSaved, true);
   const post = (route, data, overrides = {}) => fetch(`${target.origin}/${route}`, { method: 'POST', headers: { ...headers, ...overrides }, body: JSON.stringify(data) });
   assert.equal((await post('preferences', { mode: 'download' }, { Origin: 'https://evil.example' })).status, 403);
@@ -85,6 +92,16 @@ try {
   assert.equal((await post('forget', { name: 'api-key' })).status, 400);
   assert.equal((await post('forget', { name: 'douyin-session' })).status, 200);
   assert.equal(readSecret('douyin-session', env), '');
+  const lockFile = fileURLToPath(new URL('../../qwen-media-runtime/requirements.lock', import.meta.url));
+  const requirementsSha256 = createHash('sha256').update(fs.readFileSync(lockFile)).digest('hex').toUpperCase();
+  fs.writeFileSync(path.join(directory, 'toolchain.json'), JSON.stringify({ requirementsSha256, node: path.join(directory, 'missing-node.exe') }));
+  const setupScript = fileURLToPath(new URL('../../qwen-media-runtime/scripts/setup.ps1', import.meta.url));
+  const legacyEnv = { ...env };
+  // PowerShell 7 的模块搜索路径不能直接交给 Windows PowerShell 5。
+  delete legacyEnv.PSModulePath;
+  const check = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', setupScript, '-Action', 'Check'], { env: legacyEnv, encoding: 'utf8', windowsHide: true });
+  assert.equal(check.status, 0, check.stderr);
+  assert.equal(JSON.parse(check.stdout).environmentPrepared, false);
   console.log('SETUP_SECURITY_AND_PERSISTENCE_OK');
 } finally {
   child.kill();

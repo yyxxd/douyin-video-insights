@@ -22,7 +22,8 @@ const envNumber = (env, name, fallback) => {
   const value = env[name];
   if (value === undefined || value === '') return fallback;
   const number = Number(value);
-  return Number.isFinite(number) ? number : fallback;
+  if (!Number.isFinite(number) || number < 0) throw new Error(`${name} 必须为非负有限数。`);
+  return number;
 };
 
 function normalizeWorkspaceBaseUrl(value) {
@@ -95,6 +96,7 @@ export function resolveConfig(env = process.env) {
     omniModel: env.QWEN_OMNI_MODEL || 'qwen3.8-omni-flash',
     asrModel: env.QWEN_ASR_MODEL || 'qwen3-asr-flash',
     asrLongModel: env.QWEN_ASR_LONG_MODEL || 'qwen3-asr-flash-filetrans',
+    priceEnv: Object.fromEntries(Object.entries(env).filter(([name]) => /^QWEN_(OMNI|ASR)_(PRICE_MODEL|INPUT_PRICE_PER_MILLION_TOKENS|OUTPUT_PRICE_PER_MILLION_TOKENS|PRICE_PER_SECOND_CNY)$/.test(name))),
     allowUnverifiedOmniTempUpload: env.QWEN_ALLOW_UNVERIFIED_OMNI_TEMP_UPLOAD === '1',
     allowUnverifiedFiletransLocal: env.QWEN_ALLOW_UNVERIFIED_FILETRANS_LOCAL === '1',
     configDir: env.QWEN_MEDIA_CONFIG_DIR || path.join(env.LOCALAPPDATA || path.join(os.homedir(), 'AppData', 'Local'), 'QwenMediaSkills'),

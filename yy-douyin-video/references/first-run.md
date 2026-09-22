@@ -18,7 +18,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runti
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Probe
 ```
 
-将实际缺失项翻译为“运行工具、音视频处理工具、浏览器连接工具”，并根据 Probe 结果说明安装器会优先使用当前更快的官方源或国内镜像，失败时自动回退。下载的 ZIP 无论来自哪条线路都必须通过固定 SHA256 校验；PyPI 只使用 HTTPS 官方源或已登记镜像。告知会下载安装到当前用户目录，不更改系统 PATH、不收费调用模型。不要捏造安装大小和耗时。取得安装同意后执行统一入口：
+将实际缺失项翻译为“运行工具、音视频处理工具、浏览器连接工具”，并根据 Probe 结果说明安装器会优先使用当前更快的官方源或国内镜像，失败时自动回退。下载的 ZIP 无论来自哪条线路都必须通过固定 SHA256 校验；Python 使用 requirements.lock 和 require-hashes，只同步本工具的专用虚拟环境。告知会下载安装到当前用户目录，不更改系统 PATH、不收费调用模型。不要捏造安装大小和耗时。取得安装同意后执行统一入口：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Guide -Consent

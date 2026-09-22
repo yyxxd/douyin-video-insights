@@ -3,7 +3,7 @@ import { getPrices } from './pricing.mjs';
 const ceil = (value) => Math.ceil(value);
 
 export function estimateOmni(probe, prompt = '', config) {
-  const prices = getPrices(config.region);
+  const prices = getPrices(config.region, config.omniModel, 'omni', config.priceEnv);
   if (!prices.reliable) return { reliable: false, reason: prices.reason };
   const promptTokens = ceil(prompt.length / 2);
   const outputTokens = 800;
@@ -13,7 +13,8 @@ export function estimateOmni(probe, prompt = '', config) {
 }
 
 export function estimateAsr(probe, config) {
-  const prices = getPrices(config.region);
+  const model = probe.route === 'long_filetrans' ? config.asrLongModel : config.asrModel;
+  const prices = getPrices(config.region, model, 'asr', config.priceEnv);
   if (!prices.reliable || !Number.isFinite(probe.durationSeconds)) return { reliable: false, reason: prices.reason || '缺少音频时长。' };
   return { reliable: true, estimatedCost: probe.durationSeconds * prices.asrPerSecond, seconds: probe.durationSeconds };
 }
@@ -34,7 +35,8 @@ export function evaluateTask(plan) {
 }
 
 export function actualCost(kind, usage, fallbackProbe, config) {
-  const prices = getPrices(config.region);
+  const model = kind === 'omni' ? config.omniModel : fallbackProbe?.route === 'long_filetrans' ? config.asrLongModel : config.asrModel;
+  const prices = getPrices(config.region, model, kind, config.priceEnv);
   if (!prices.reliable) return { reliable: false };
   if (kind === 'omni') {
     const input = Number(usage?.prompt_tokens);
@@ -42,6 +44,7 @@ export function actualCost(kind, usage, fallbackProbe, config) {
     if (!Number.isFinite(input) || !Number.isFinite(output)) return { reliable: false };
     return { reliable: true, cost: input / 1e6 * prices.omniInputPerMillion + output / 1e6 * prices.omniOutputPerMillion };
   }
-  const seconds = Number(usage?.seconds ?? fallbackProbe?.durationSeconds);
+  if (usage?.seconds === undefined || usage?.seconds === null) return { reliable: false, source: 'duration-estimate' };
+  const seconds = Number(usage.seconds);
   return Number.isFinite(seconds) ? { reliable: true, cost: seconds * prices.asrPerSecond } : { reliable: false };
 }

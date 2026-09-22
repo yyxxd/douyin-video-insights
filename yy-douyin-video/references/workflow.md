@@ -33,7 +33,13 @@ node <repo>/yy-qwen-omni/scripts/run_qwen_omni.mjs --file <task>/video.mp4 --pro
 
 按 Omni Skill 的既有规则，临时上传时加 `--force-temp-upload`。需要费用确认时，只在获得具体金额授权后使用 `--confirm --approved-cost-ceiling <金额>`。普通结果里的 requiresConfirmation 不是成功分析。
 
-4. 将 `omni.json` 中 `results[0].content` 解析为 JSON，保存为 `shots.json`；可剥除包裹完整结果的 Markdown 代码围栏，不用 eval，不靠改写时间线掩盖漏镜头。格式见 [storyboard-prompt.txt](storyboard-prompt.txt)。结构不合法时先判断能否无损提取，无法修复则报告失败或在预算内登记新的复核调用。
+4. 使用固定解析入口将 Omni 结果校验并保存为 `shots.json`：
+
+```text
+node <skill>/scripts/parse_storyboard_result.mjs --omni <task>/omni.json --media <task>/media.json --asr <task>/asr.json --out <task>/shots.json
+```
+
+无音轨时省略 `--asr`。只接受完整 JSON 或包裹完整结果的代码围栏，拒绝未完成结果、缺失字段和不完整时间覆盖，不用 eval，不改写时间线掩盖漏镜头。格式见 [storyboard-prompt.txt](storyboard-prompt.txt)。失败时报告原因，额外模型复核必须使用新的 Operation ID 并遵守预算。
 5. 按候选切点和实际画面检查镜头划分。出现遗漏快切、动作不清或镜头边界可疑时，裁剪对应原片片段复核。保留 `offsetSeconds`，将模型片段时间加偏移映射回全片；片段不能冒充完整视频。新增调用单独登记预算，不能复用原来的 omni ID。
 6. 渲染报告：
 
@@ -48,7 +54,7 @@ node <skill>/scripts/render_storyboard.mjs --media <task>/media.json --asr <task
 
 同一任务不重复下载、转写。复用前核对 media.json 的源文件和时长，以及模式、模型、转写设置是否仍匹配；新文件不能直接沿用旧时间线。
 
-所有已登记 Operation 达到 completed/failed/cancelled 后调用 runtime 的 `finalizeTask(taskId)`。放弃后续步骤时先调用 `cancelOpenOperations(taskId, config)`，再 finalize；不要取消其他正在执行的任务。保存本任务返回的实际或估算费用到交付说明，不能把二者混称。
+所有已登记 Operation 达到 completed/failed/cancelled 后调用 runtime 的 `finalizeTask(taskId)`（从 `qwen-media-runtime/src/task_budget.mjs` 导入）。放弃后续步骤时先调用 `cancelOpenOperations(taskId, config)`，它只取消 planned 操作，不会取消正在执行的任务。finalize 保留 `.finalized.json` 费用归档，旧 Task ID 不可重用。保存本任务返回的实际或估算费用到交付说明，不能把二者混称；未知费用估算仍占预算。
 
 ## 已知验证边界
 

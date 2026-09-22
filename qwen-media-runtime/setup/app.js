@@ -2,6 +2,7 @@ const $ = id => document.getElementById(id);
 const token = location.pathname.slice(1);
 let initialized = false;
 let aiPresent = false;
+let finished = false;
 
 async function request(route, data) {
   const response = await fetch(`/${route}`, { method: data ? 'POST' : 'GET', headers: { 'X-Setup-Token': token, ...(data ? { 'Content-Type': 'application/json' } : {}) }, ...(data ? { body: JSON.stringify(data) } : {}) });
@@ -48,6 +49,7 @@ function bind(id, route, getData) {
       if (route === 'ai') $('key').value = '';
       $('notice').textContent = result.message;
       closed = ['finish', 'cancel'].includes(route);
+      finished = closed;
       if (closed) document.querySelectorAll('button,input,select').forEach(element => { element.disabled = true; });
       else await refresh();
     } catch (error) { $('notice').textContent = error.message; }
@@ -69,4 +71,4 @@ bind('finish', 'finish', () => ({}));
 bind('cancel', 'cancel', () => confirm('暂停后 Agent 不会继续原任务，已完成的配置会保留。确定暂停吗？') ? {} : null);
 $('refresh').onclick = () => refresh().catch(error => { $('notice').textContent = error.message; });
 refresh().catch(error => { $('notice').textContent = error.message; });
-setInterval(() => refresh().catch(() => {}), 4000);
+setInterval(() => { if (!finished) refresh().catch(error => { $('notice').textContent = error.message; }); }, 4000);

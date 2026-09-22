@@ -1,0 +1,16 @@
+{
+  "name": "douyin-video-insights",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.21.0",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "check": "node scripts/check.mjs",
+    "test": "node scripts/test.mjs",
+    "test:unit": "node scripts/test.mjs --unit",
+    "test:offline": "node scripts/test.mjs",
+    "package": "node scripts/package.mjs",
+    "check:package": "node scripts/check-package.mjs"
+  }
+}

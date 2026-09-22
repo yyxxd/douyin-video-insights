@@ -11,6 +11,8 @@ description: 使用 Qwen ASR 将用户明确要求转写的音频或含音轨视
 
 当用户明确说“用 ASR 识别”“转写这个录音”“提取这个视频的口播稿”“把视频转成文字”“识别视频里的人说了什么”等，调用 `scripts/run_qwen_asr.mjs`。视频文件不应因为扩展名而自动调用 Qwen Omni；只要用户的意图是语音转写，就选择 Qwen ASR。仅提供音频或视频而没有处理要求时不要调用。
 
+本地媒体任务的运行门槛是 Node.js 22+、FFmpeg/FFprobe 和有效 AI 配置，不要求抖音登录或 guideStatus=complete。已有可用环境直接执行；缺失时按首次配置说明补齐。模型调用前会预留输出路径，已有文件不覆盖；partial 结果不能用于下一步，已完成 Operation 和归档 Task ID 不可重用。
+
 执行顺序：
 
 1. 首次或每次运行先调用共享 runtime 的 `init_qwen_media.mjs`。
