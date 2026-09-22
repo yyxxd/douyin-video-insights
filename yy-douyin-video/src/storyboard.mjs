@@ -1,9 +1,11 @@
 export const fields = { composition: '画面与构图', action: '起始状态 → 动作 → 结束状态', camera: '景别、机位与运镜', transition: '剪辑与转场', screenText: '画面文字', sound: '音乐与音效', purpose: '叙事作用（分析）', uncertainty: '待确认信息' };
 
 export function validateStoryboard(data, media, segments) {
+  if (!data || typeof data !== 'object') throw new Error('分镜结果必须是对象。');
   if (!Array.isArray(data.shots) || !data.shots.length || typeof data.summary !== 'string') throw new Error('缺少 summary 或 shots。');
   let previous = 0;
   for (const [index, shot] of data.shots.entries()) {
+    if (!shot || typeof shot !== 'object') throw new Error(`镜头 ${index + 1} 必须是对象。`);
     if (!Number.isFinite(shot.start) || !Number.isFinite(shot.end) || shot.start < 0 || shot.end <= shot.start || shot.end > media.durationSeconds + 0.05) throw new Error(`镜头 ${index + 1} 时间无效。`);
     if (Math.abs(shot.start - previous) > 0.05) throw new Error(`镜头 ${index + 1} 存在时间空隙或重叠。`);
     for (const field of Object.keys(fields)) if (typeof shot[field] !== 'string' || !shot[field].trim()) throw new Error(`镜头 ${index + 1} 缺少 ${field}。`);

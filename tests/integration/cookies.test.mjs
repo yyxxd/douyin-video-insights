@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { netscapeCookies, withCookies } from './cookies.mjs';
+import { netscapeCookies, withCookies } from '../../yy-douyin-video/src/cookies.mjs';
 
 const cookie = { domain: '.douyin.com', hostOnly: false, path: '/', secure: true, name: '', value: 'test', session: true };
 const content = netscapeCookies(JSON.stringify([cookie, { ...cookie, domain: '.example.com' }]));

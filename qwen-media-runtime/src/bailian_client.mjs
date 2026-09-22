@@ -4,10 +4,11 @@ async function request(url, options = {}, timeoutMs = 120000) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const response = await fetch(url, { ...options, signal: controller.signal });
+    const response = await fetch(url, { redirect: 'error', ...options, signal: controller.signal });
     const text = await response.text();
     let body;
-    try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+    try { body = text ? JSON.parse(text) : {}; }
+    catch { throw new RuntimeError('百炼返回的内容不是有效 JSON。', 'INVALID_RESPONSE'); }
     if (!response.ok) throw new RuntimeError(body.message || body.error?.message || `百炼请求失败（HTTP ${response.status}）。`, 'API_ERROR', { status: response.status, body });
     return body;
   } catch (error) {
@@ -33,7 +34,9 @@ export function taskQuery(config, taskId, endpoints = config.endpoints) {
 }
 
 export async function fetchResultJson(config, url) {
-  return request(url, { headers: { Authorization: `Bearer ${config.apiKey}`, 'X-DashScope-OssResourceResolve': 'enable' } });
+  const target = new URL(url);
+  if (target.protocol !== 'https:' || target.username || target.password) throw new RuntimeError('结果下载必须使用无内嵌凭据的 HTTPS URL。', 'RESULT_URL_INVALID');
+  return request(target, { redirect: 'error' });
 }
 
 export { request };

@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import https from 'node:https';
 import { PassThrough, Writable } from 'node:stream';
-import { uploadTemporary } from './temp_upload.mjs';
+import { uploadTemporary } from '../../qwen-media-runtime/scripts/temp_upload.mjs';
 
 const originalRequest = https.request;
 const directory = await fs.mkdtemp(path.join(os.tmpdir(), 'qwen-upload-test-'));

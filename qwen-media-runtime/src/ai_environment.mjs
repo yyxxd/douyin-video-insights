@@ -3,7 +3,7 @@ import { fileURLToPath } from 'node:url';
 
 function userVariable(action, value = '') {
   if (process.platform !== 'win32') return '';
-  const script = fileURLToPath(new URL('./ai-environment.ps1', import.meta.url));
+  const script = fileURLToPath(new URL('../scripts/ai-environment.ps1', import.meta.url));
   const result = spawnSync('powershell.exe', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', script, '-Action', action], { input: value, encoding: 'utf8', windowsHide: true, timeout: 10000 });
   if (result.status !== 0) throw new Error('无法访问当前用户的 AI 环境变量，请检查系统权限。');
   return result.stdout;

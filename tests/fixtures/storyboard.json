@@ -1,0 +1,9 @@
+{
+  "summary": "离线合成镜头，不代表真实模型质量",
+  "shots": [{
+    "start": 0, "end": 2, "frames": [0.5],
+    "composition": "红色画面", "action": "静止", "camera": "固定机位",
+    "transition": "无", "screenText": "无", "sound": "无",
+    "purpose": "测试", "uncertainty": "无实际语义验收"
+  }]
+}

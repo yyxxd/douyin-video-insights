@@ -34,17 +34,35 @@ function Select-PythonIndexes {
     return @($available) + @($packages.pythonIndexes | Where-Object { $_.url -notin $available.url })
 }
 
+function Test-Executable($File, $Name) {
+    if (!$File -or ![IO.Path]::IsPathRooted($File) -or !(Test-Path -LiteralPath $File -PathType Leaf)) { return $false }
+    try {
+        $flag = if ($Name -in @('ffmpeg','ffprobe')) { '-version' } else { '--version' }
+        $version = & $File $flag 2>$null
+        if ($LASTEXITCODE -ne 0) { return $false }
+        if ($Name -eq 'node') { return "$version" -match '^v(2[2-9]|[3-9]\d)\.' }
+        if ($Name -eq 'python') { return "$version" -match '^Python 3\.(1[1-9]|[2-9]\d)\.' }
+        return $true
+    } catch { return $false }
+}
+
+function Test-Toolchain($Tools) {
+    if (!$Tools) { return $false }
+    $requiredHash = (Get-FileHash (Join-Path $PSScriptRoot '../requirements.lock') -Algorithm SHA256).Hash
+    if ($Tools.requirementsSha256 -ne $requiredHash) { return $false }
+    foreach ($name in @('node','uv','python','ffmpeg')) {
+        if (!(Test-Executable $Tools.$name $name)) { return $false }
+    }
+    return Test-Executable (Join-Path (Split-Path $Tools.ffmpeg) 'ffprobe.exe') 'ffprobe'
+}
+
 function Find-Tool($Name) {
     $candidate = Get-Command "$Name.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($candidate) {
-        $flag = if ($Name -eq 'ffmpeg') { '-version' } else { '--version' }
-        $version = & $candidate.Source $flag 2>$null
-        if ($LASTEXITCODE -eq 0 -and ($Name -ne 'node' -or "$version" -match '^v(2[2-9]|[3-9]\d)\.')) { return $candidate.Source }
-    }
+    if ($candidate -and (Test-Executable $candidate.Source $Name)) { return $candidate.Source }
     $directory = Join-Path $root "tools/$Name"
     if (Test-Path $directory) {
         $file = Get-ChildItem $directory -Filter "$Name.exe" -Recurse | Select-Object -First 1
-        if ($file) { return $file.FullName }
+        if ($file -and (Test-Executable $file.FullName $Name)) { return $file.FullName }
     }
     return $null
 }
@@ -104,25 +122,26 @@ function Install-Environment {
     Set-ProcessPaths $tools
     $env:UV_PYTHON_INSTALL_DIR = Join-Path $root 'tools/python'
     $python = Join-Path $root 'tools/venv/Scripts/python.exe'
-    if (!(Test-Path $python)) {
+    if (!(Test-Executable $python 'python')) {
         $githubSource = @(Select-Sources $packages.uv) | Select-Object -First 1
         if ($githubSource.name -eq 'ghfast') { $env:UV_PYTHON_INSTALL_MIRROR = 'https://ghfast.top/https://github.com/astral-sh/python-build-standalone/releases/download' }
-        & $tools.uv venv --python 3.11 (Join-Path $root 'tools/venv')
+        & $tools.uv venv --allow-existing --python 3.11 (Join-Path $root 'tools/venv')
         if ($LASTEXITCODE -ne 0 -and $env:UV_PYTHON_INSTALL_MIRROR) {
             Remove-Item Env:UV_PYTHON_INSTALL_MIRROR -ErrorAction SilentlyContinue
             Write-Host 'Python 镜像不可用，正在回退官方源。'
-            & $tools.uv venv --python 3.11 (Join-Path $root 'tools/venv')
+            & $tools.uv venv --allow-existing --python 3.11 (Join-Path $root 'tools/venv')
         }
         if ($LASTEXITCODE -ne 0) { throw 'Python 环境准备失败，可重试继续。' }
     }
     $installed = $false
     foreach ($index in @(Select-PythonIndexes)) {
         Write-Host "使用$($index.name)安装浏览器连接工具。"
-        & $tools.uv pip install --python $python --default-index $index.url 'playwright==1.63.0'
+        & $tools.uv pip sync --python $python --default-index $index.url --require-hashes (Join-Path $PSScriptRoot '../requirements.lock')
         if ($LASTEXITCODE -eq 0) { $installed = $true; break }
     }
     if (!$installed) { throw '浏览器连接工具安装失败，PyPI 官方源和镜像均不可用。' }
     $tools.python = $python
+    $tools.requirementsSha256 = (Get-FileHash (Join-Path $PSScriptRoot '../requirements.lock') -Algorithm SHA256).Hash
     foreach ($name in @('node','uv','python')) { & $tools[$name] --version; if ($LASTEXITCODE -ne 0) { throw "$name 无法运行。" } }
     $probeVersion = & (Join-Path (Split-Path $tools.ffmpeg) 'ffprobe.exe') -version
     if ($LASTEXITCODE -ne 0) { throw '视频检查工具无法运行。' }
@@ -136,7 +155,8 @@ try {
         $tools = Get-Tools
         $missing = @('node','uv','ffmpeg') | Where-Object { !$tools[$_] } | ForEach-Object { $packages.$_.label }
         $saved = if (Test-Path (Join-Path $root 'setup.json')) { Get-Content -Raw -Encoding UTF8 (Join-Path $root 'setup.json') | ConvertFrom-Json } else { $null }
-        @{ configuration=$saved; loginSaved=(Test-Path (Join-Path $root 'douyin-session.protected')); aiSaved=[bool]([Environment]::GetEnvironmentVariable('DASHSCOPE_API_KEY', 'User') -or $env:DASHSCOPE_API_KEY); supported=$true; directory=$root; missing=@($missing); environmentPrepared=(Test-Path (Join-Path $root 'toolchain.json')); next='获得安装同意后运行 Guide，一次完成抖音、AI 和费用配置；用户可在页面明确跳过 AI。'; pythonEnvironment='独立 Python 3.11 与浏览器连接工具；缺失时自动下载' } | ConvertTo-Json
+        $installed = if (Test-Path (Join-Path $root 'toolchain.json')) { Get-Content -Raw -Encoding UTF8 (Join-Path $root 'toolchain.json') | ConvertFrom-Json } else { $null }
+        @{ configuration=$saved; loginSaved=(Test-Path (Join-Path $root 'douyin-session.protected')); aiSaved=[bool]([Environment]::GetEnvironmentVariable('DASHSCOPE_API_KEY', 'User') -or $env:DASHSCOPE_API_KEY); supported=$true; directory=$root; missing=@($missing); environmentPrepared=(Test-Toolchain $installed); next='获得安装同意后运行 Guide，一次完成抖音、AI 和费用配置；用户可在页面明确跳过 AI。'; pythonEnvironment='独立 Python 3.11 与浏览器连接工具；缺失时自动下载' } | ConvertTo-Json
         exit 0
     }
     if ($Action -eq 'Probe') {
@@ -151,7 +171,9 @@ try {
     }
     if ($Action -eq 'Install') { Install-Environment; exit 0 }
     if ($Action -eq 'Guide') {
-        if (!(Test-Path (Join-Path $root 'toolchain.json'))) { Install-Environment }
+        $toolchainFile = Join-Path $root 'toolchain.json'
+        $existing = if (Test-Path $toolchainFile) { Get-Content -Raw -Encoding UTF8 $toolchainFile | ConvertFrom-Json } else { $null }
+        if (!(Test-Toolchain $existing)) { Install-Environment }
         $tools = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'toolchain.json') | ConvertFrom-Json
         Set-ProcessPaths $tools
         & $tools.node (Join-Path $PSScriptRoot 'setup-server.mjs')

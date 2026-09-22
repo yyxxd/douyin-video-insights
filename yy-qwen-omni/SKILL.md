@@ -11,6 +11,8 @@ description: 使用 Qwen Omni 理解用户明确要求分析的视频画面、�
 
 当用户明确说“理解一下这个视频”“分析这个视频”“这个视频讲了什么”“拆成分镜”“分析镜头设计”或要求分析画面、人物动作、场景和视频结构时，调用 `scripts/run_qwen_omni.mjs`。如果用户要求提取口播、台词、旁白或把视频语音转成文字，应选择 Qwen ASR，不要因为输入是视频而调用本 Skill。仅提供视频而没有处理要求时不要调用。
 
+本地媒体任务的运行门槛是 Node.js 22+、FFmpeg/FFprobe 和有效 AI 配置，不要求抖音登录或 guideStatus=complete。已有可用环境直接执行；缺失时按首次配置说明补齐。模型调用前会预留输出路径，已有文件不覆盖；partial 结果不能用于下一步，已完成 Operation 和归档 Task ID 不可重用。
+
 执行顺序：
 
 1. 首次或每次运行先调用共享 runtime 的 `init_qwen_media.mjs`。
