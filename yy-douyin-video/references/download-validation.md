@@ -1,8 +1,27 @@
 # 抖音下载方案验证
 
-## 结论与执行方式
+当前入口执行 yt-dlp 优先、浏览器回退、双失败人工接管；下面的旧数据不能当作当前链路验收。
 
-2026-09-21：推荐独立 Chrome + Playwright，在浏览器内取得作品详情中的完整播放地址，再下载并核对时长、全片解码。四个分享链接均通过，已提供 `scripts/download_browser.py`。此入口不依赖 AIX、第三方解析服务、Docker 或模型 API。
+## 当前链路验收（2026-09-22）
+
+四个真实样例均先运行 yt-dlp，再自动转浏览器成功：前三项在详情阶段返回 HTTP 403；第四项取得文件但未通过视频流／时长完整性校验。全部最终下载文件带音轨、时长匹配且全片解码通过。本次没有把抖音 yt-dlp 首路成功标记为已验证。
+
+| 作品 ID | 入口及用途 | 成品分辨率 | 下载时长 |
+| --- | --- | --- | --- |
+| 7684213955167084657 | download / analysis 默认画质 | 720×1280 | 25.83 秒 |
+| 7686769474703347007 | download / 用户指定 1080p | 1080×1920 | 54.93 秒 |
+| 7627428410046552290 | setup Run / 加密登录复用 / analysis | 720×1280 | 28.57 秒 |
+| 7681510657833727651 | prepare --share / analysis | 720×1280 | 15.51 秒 |
+
+加密登录验收使用隔离配置目录，将既有测试 Cookie 经原 save_session / DPAPI 保存后调用 setup Run，不传 --cookies；任务结束删除隔离凭据。没有进行新的扫码登录，也没有修改日常配置。
+
+1080p 成品另经 prepare --file --resolution 720 生成 720p 分析视频、音频和候选切点，全程不再次下载。测试产物位于本机 work/download-validation，不进入发布包。
+
+离线覆盖首路成功、回退成功、双失败、取消、超时、凭据转换与清理、DPAPI 复用、输出目录保护、画质选择和媒体校验。使用本地 HTTP 合成素材调用真实 yt-dlp，验证 720p、1080p、best 格式选择与下载；仅元数据提取使用测试替身，不把它等同于抖音在线首路成功。
+
+## 历史验证（2026-09-21，旧浏览器优先策略）
+
+2026-09-21 旧策略：推荐独立 Chrome + Playwright，在浏览器内取得作品详情中的完整播放地址，再下载并核对时长、全片解码。四个分享链接均通过，已提供 `scripts/download_browser.py`。此入口不依赖 AIX、第三方解析服务、Docker 或模型 API。
 
 | 样例 | 时长 | 分辨率 | 音轨 / 全片解码 |
 | --- | --- | --- | --- |
@@ -12,7 +31,7 @@
 | 为什么牙齿不好 | 15.51 秒 | 1080×1920 | 通过 |
 
 ```powershell
-uv run --no-project --with playwright==1.63.0 python yy-douyin-video/scripts/download_browser.py --share "https://v.douyin.com/vWhV5lbQYFc/" --cookies "<你的JSON Cookie文件绝对路径>" --out "work/我的视频下载"
+uv run --no-project --with playwright==1.63.0 --with yt-dlp==2026.8.19 python yy-douyin-video/scripts/download_video.py --purpose download --resolution 1080 --share "https://v.douyin.com/vWhV5lbQYFc/" --cookies "<你的JSON Cookie文件绝对路径>" --out "work/我的视频下载"
 ```
 
 从仓库根目录执行；输出目录必须不存在。要求本机 Chrome、FFmpeg、FFprobe 和 uv。测试安装在 `work/download-research/.venv`，也可使用其中的 Python 直接运行。无需执行 `playwright install`，脚本调用系统 Chrome。
@@ -23,7 +42,7 @@ uv run --no-project --with playwright==1.63.0 python yy-douyin-video/scripts/dow
 node yy-douyin-video/scripts/prepare_video.mjs --file "work/我的视频下载/video.mp4" --out "work/我的视频素材"
 ```
 
-## 已确认的原因
+## 历史样例已确认的原因
 
 - 直接详情请求失败时，实际响应为 HTTP 403，正文为 `Blocked by ArgusSecurityPlugin Uifid Not Found`。这是接口请求门禁；不是 MP4 解码失败。
 - 第一个作品 `7684213955167084657` 的页面详情返回 `allow_download=false`，但浏览器入口已下载完整视频。

@@ -1,8 +1,8 @@
 import { withArtifactDirectory } from './artifacts.mjs';
 import path from 'node:path';
 import { probeMedia } from '../../qwen-media-runtime/src/media_probe.mjs';
-import { run, writeJson, inside } from './common.mjs';
-import { withCookies } from './cookies.mjs';
+import { run, writeJson } from './common.mjs';
+import { downloadVideo } from './download_video.mjs';
 
 export function shareUrl(text) {
   const urls = text.replace(/\\_/g, '_').match(/https:\/\/[^\s<>"\])]+/g) || [];
@@ -15,36 +15,21 @@ export function shareUrl(text) {
   return unique[0];
 }
 
-async function download(share, output, browser, cookies) {
-  const url = shareUrl(share);
-  if (browser && !['chrome', 'edge', 'firefox'].includes(browser)) throw new Error('浏览器仅支持 chrome、edge、firefox。');
-  if (browser && cookies) throw new Error('browser 与 cookies 不能同时指定。');
-  const args = ['--ignore-config', '--no-playlist', '--no-progress', '--socket-timeout', '20', '--retries', '0', '--max-filesize', '500M', '--merge-output-format', 'mp4', '-o', path.join(output, 'source.%(ext)s'), '--print', 'after_move:filepath'];
-  if (browser) args.push('--cookies-from-browser', browser);
-  try {
-    const result = await withCookies(cookies, (cookieFile) => run('yt-dlp', [...args, ...(cookieFile ? ['--cookies', cookieFile] : []), '--', url], 180000));
-    const file = result.stdout.trim().split(/\r?\n/).at(-1);
-    if (!file) throw new Error('下载工具未返回视频文件。');
-    return inside(output, path.resolve(file));
-  } catch (error) {
-    if (/Could not copy.*cookie database/i.test(error.diagnostic || '')) throw new Error('Chrome Cookie 数据库无法复制。请用户自行关闭浏览器后重试，或提供本地视频。');
-    if (/403/.test(error.diagnostic || '')) throw new Error('抖音接口返回 HTTP 403；仅凭此响应无法判定 Cookie 失效。请检查该链接在浏览器中是否可播放，或提供本地视频。');
-    if (/cookies|login|DPAPI|decrypt/i.test(error.diagnostic || '')) throw new Error('抖音获取受访问权限或 Cookie 解密限制；请提供本地视频，或经授权使用可用的浏览器 Cookie。');
-    throw new Error(`视频下载失败：${error.message} 可提供本地视频继续。`);
-  }
-}
-
 export async function prepare(options) {
   if (!options.out || Boolean(options.file) === Boolean(options.share)) throw new Error('提供 --out 和 --file 或 --share 之一。');
+  if (options.resolution && !['720', '1080', 'best'].includes(options.resolution)) throw new Error('resolution 仅支持 720、1080、best。');
   return withArtifactDirectory(options.out, output => prepareMedia(options, output));
 }
 
 async function prepareMedia(options, output) {
-  const source = options.file ? path.resolve(options.file) : await download(options.share, output, options.browser, options.cookies);
+  const source = options.file ? path.resolve(options.file) : await downloadVideo(options, path.join(output, 'download'));
   const probe = await probeMedia(source, 'omni');
   if (!Number.isFinite(probe.durationSeconds) || probe.durationSeconds <= 0) throw new Error('视频缺少有效时长。');
   const video = path.join(output, 'video.mp4');
-  await run('ffmpeg', ['-v', 'error', '-nostdin', '-n', '-i', source, '-map', '0:v:0', '-map', '0:a:0?', '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-c:a', 'aac', '-movflags', '+faststart', video]);
+  const target = options.resolution && options.resolution !== 'best' ? Number(options.resolution) : null;
+  const scale = target && Math.min(probe.video.width, probe.video.height) > target
+    ? ['-vf', `scale=if(gte(iw\\,ih)\\,-2\\,${target}):if(gte(iw\\,ih)\\,${target}\\,-2)`] : [];
+  await run('ffmpeg', ['-v', 'error', '-nostdin', '-n', '-i', source, '-map', '0:v:0', '-map', '0:a:0?', ...scale, '-c:v', 'libx264', '-preset', 'fast', '-crf', '18', '-c:a', 'aac', '-movflags', '+faststart', video]);
   const media = await probeMedia(video, 'omni');
   let audio = null;
   if (media.audio) {

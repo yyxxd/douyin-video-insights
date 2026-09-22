@@ -18,7 +18,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runti
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Probe
 ```
 
-将实际缺失项翻译为“运行工具、音视频处理工具、浏览器连接工具”，并根据 Probe 结果说明安装器会优先使用当前更快的官方源或国内镜像，失败时自动回退。下载的 ZIP 无论来自哪条线路都必须通过固定 SHA256 校验；Python 使用 requirements.lock 和 require-hashes，只同步本工具的专用虚拟环境。告知会下载安装到当前用户目录，不更改系统 PATH、不收费调用模型。不要捏造安装大小和耗时。取得安装同意后执行统一入口：
+将实际缺失项翻译为“运行工具、音视频处理工具、yt-dlp 下载与浏览器连接工具”，并根据 Probe 结果说明安装器会优先使用当前更快的官方源或国内镜像，失败时自动回退。下载的 ZIP 无论来自哪条线路都必须通过固定 SHA256 校验；Python 使用 requirements.lock 和 require-hashes，只同步本工具的专用虚拟环境。告知会下载安装到当前用户目录，不更改系统 PATH、不收费调用模型。不要捏造安装大小和耗时。取得安装同意后执行统一入口：
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Guide -Consent
@@ -55,14 +55,14 @@ AI 密钥保存为当前 Windows 用户的 DASHSCOPE_API_KEY 环境变量，不�
 在 PowerShell 中调用（参数是数组，不拼接用户文案为脚本）：
 
 ```powershell
-& "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Run -Task download -TaskArguments @('--share','<分享链接>','--out','<新目录>')
+& "<repo>/qwen-media-runtime/scripts/setup.ps1" -Action Run -Task download -TaskArguments @('--share','<分享链接>','--purpose','download','--resolution','720','--out','<新目录>')
 ```
 
-自动使用本机加密登录，无需 `--cookies`。支持的 Task 为 download、prepare、asr、omni；参数沿用原脚本。这个入口会设置本次进程工具路径，不依赖用户终端 PATH。后续编排的其他 Node 脚本也应在相同工具路径环境运行，或由 Agent 从 toolchain.json 取得可执行路径。
+上例 720 是用户已选画质的示例；主动下载未指定画质时先询问，不能直接默认 720。分析任务使用 `--purpose analysis`，自动默认 720p。自动使用本机加密登录，无需 `--cookies`。yt-dlp 失败自动转浏览器，两条路线都失败后转人工下载。已有配置升级只需补齐锁定依赖，保留登录。支持的 Task 为 download、prepare、asr、omni；参数沿用原脚本。这个入口会设置本次进程工具路径，不依赖用户终端 PATH。后续编排的其他 Node 脚本也应在相同工具路径环境运行，或由 Agent 从 toolchain.json 取得可执行路径。
 
 重新执行 Check 可读取不含密钥的配置状态。查看下载的 download.json，只有文件生成、时长匹配、全片解码通过才交付。ASR / Omni 成功的真实任务会分别写入 asr-validation.json、omni-validation.json；这些只说明当时该模型调用成功，不代表所有模型永久可用。更换密钥会清除这两项验证记录。
 
-需要登录或验证码时重新打开连接流程，不要求用户导出文件。用户只配置未提供素材时，明确“环境已准备，真实任务待验证”，请其提供素材。已有原任务时继续完成任务，不以“配置成功”结束。
+下载双失败时先解释各路线原因并引导手动下载；用户选择重新连接时再打开配置流程，不要求导出文件。用户只配置未提供素材时，明确“环境已准备，真实任务待验证”，请其提供素材。已有原任务时继续完成任务，不以“配置成功”结束。
 
 ## 保存位置与清除
 

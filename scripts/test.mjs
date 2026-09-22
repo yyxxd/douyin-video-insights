@@ -9,6 +9,7 @@ const suites = [
   ['tests/integration/task_plan.test.mjs'],
   ['tests/integration/temp_upload.test.mjs'],
   ['tests/integration/cookies.test.mjs'],
+  ['tests/integration/download.test.mjs'],
   ['tests/integration/workflow.test.mjs'],
 ];
 if (process.platform === 'win32') suites.push(['tests/integration/setup.test.mjs']);

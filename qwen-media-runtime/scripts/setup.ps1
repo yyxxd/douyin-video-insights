@@ -53,6 +53,8 @@ function Test-Toolchain($Tools) {
     foreach ($name in @('node','uv','python','ffmpeg')) {
         if (!(Test-Executable $Tools.$name $name)) { return $false }
     }
+    & $Tools.python -m yt_dlp --version *> $null
+    if ($LASTEXITCODE -ne 0) { return $false }
     return Test-Executable (Join-Path (Split-Path $Tools.ffmpeg) 'ffprobe.exe') 'ffprobe'
 }
 
@@ -107,6 +109,7 @@ function Set-ProcessPaths($tools) {
     $env:PATH = ($directories -join ';') + ';' + $env:PATH
     $env:QWEN_MEDIA_CONFIG_DIR = $root
     $env:PYTHONIOENCODING = 'utf-8'
+    if ($tools.python) { $env:QWEN_MEDIA_PYTHON = $tools.python }
     $userKey = [Environment]::GetEnvironmentVariable('DASHSCOPE_API_KEY', 'User')
     if ($userKey) { $env:DASHSCOPE_API_KEY = $userKey }
     elseif (Test-Path (Join-Path $root 'setup.json')) {
@@ -135,11 +138,11 @@ function Install-Environment {
     }
     $installed = $false
     foreach ($index in @(Select-PythonIndexes)) {
-        Write-Host "使用$($index.name)安装浏览器连接工具。"
+        Write-Host "使用$($index.name)安装下载与浏览器连接工具。"
         & $tools.uv pip sync --python $python --default-index $index.url --require-hashes (Join-Path $PSScriptRoot '../requirements.lock')
         if ($LASTEXITCODE -eq 0) { $installed = $true; break }
     }
-    if (!$installed) { throw '浏览器连接工具安装失败，PyPI 官方源和镜像均不可用。' }
+    if (!$installed) { throw '下载与浏览器连接工具安装失败，PyPI 官方源和镜像均不可用。' }
     $tools.python = $python
     $tools.requirementsSha256 = (Get-FileHash (Join-Path $PSScriptRoot '../requirements.lock') -Algorithm SHA256).Hash
     foreach ($name in @('node','uv','python')) { & $tools[$name] --version; if ($LASTEXITCODE -ne 0) { throw "$name 无法运行。" } }
@@ -182,7 +185,7 @@ try {
     $tools = Get-Content -Raw -Encoding UTF8 (Join-Path $root 'toolchain.json') | ConvertFrom-Json
     Set-ProcessPaths $tools
     if ($Action -eq 'Open') { & $tools.node (Join-Path $PSScriptRoot 'setup-server.mjs'); exit $LASTEXITCODE }
-    $entries = @{download='yy-douyin-video/scripts/download_browser.py';prepare='yy-douyin-video/scripts/prepare_video.mjs';asr='yy-qwen-asr/scripts/run_qwen_asr.mjs';omni='yy-qwen-omni/scripts/run_qwen_omni.mjs'}
+    $entries = @{download='yy-douyin-video/scripts/download_video.py';prepare='yy-douyin-video/scripts/prepare_video.mjs';asr='yy-qwen-asr/scripts/run_qwen_asr.mjs';omni='yy-qwen-omni/scripts/run_qwen_omni.mjs'}
     $exe = if ($Task -eq 'download') { $tools.python } else { $tools.node }
     & $exe (Join-Path $repo $entries[$Task]) @TaskArguments
     exit $LASTEXITCODE
